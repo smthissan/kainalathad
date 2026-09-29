@@ -1,0 +1,9 @@
+{
+  "rewrites": [
+    {"source": "/articles/:path*", "destination": "/index.html"},
+    {"source": "/products/:path*", "destination": "/index.html"},
+    {"source": "/services/:path*", "destination": "/index.html"},
+    {"source": "/media/:path*", "destination": "/index.html"},
+    {"source": "/portfolio/:path*", "destination": "/index.html"}
+  ]
+}
