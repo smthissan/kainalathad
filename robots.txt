@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://kianalathad.com/sitemap.xml
+https://kianalathad.com/robots.txt
