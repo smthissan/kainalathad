@@ -1,0 +1,15 @@
+{
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "npm run test:rules && npm run test:e2e",
+    "test:rules": "cd .. && firebase emulators:exec --only firestore,storage,auth --project kian-test \"node --test tests/rules.test.mjs\"",
+    "test:e2e": "node e2e.test.mjs && node admin.e2e.test.mjs"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.0",
+    "firebase": "^12.0.0",
+    "firebase-tools": "^14.0.0",
+    "playwright": "^1.56.0"
+  }
+}
