@@ -1,0 +1,44 @@
+rules_version = '2';
+
+// قواعد Firebase Storage لموقع كيان للبرمجيات.
+// - صور العرض (preview) وصورة البانر: قراءة عامة، والرفع والحذف للمدير فقط.
+// - ملفات المنتجات المدفوعة (products/{id}/file/...): لا يقرؤها أحد من المتصفح،
+//   وتُسلَّم فقط عبر رابط مؤقت من الدالة السحابية getProductDownloadUrl.
+// النشر: firebase deploy --only storage
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isAdmin() {
+      return request.auth != null && request.auth.token.email == 'smthysan@gmail.com';
+    }
+
+    // الحذف: request.resource يكون null
+    function adminImageWrite() {
+      return isAdmin() && (request.resource == null
+        || (request.resource.contentType.matches('image/.*') && request.resource.size < 10 * 1024 * 1024));
+    }
+
+    // صور العرض لكل أنواع المحتوى (المسارات التي تستخدمها admin.html)
+    match /{kind}/{id}/preview/{file} {
+      allow read: if kind in ['products', 'services', 'articles', 'portfolio', 'media'];
+      allow write: if kind in ['products', 'services', 'articles', 'portfolio', 'media'] && adminImageWrite();
+    }
+
+    // صورة البانر في الصفحة الرئيسية
+    match /site/hero/{file} {
+      allow read: if true;
+      allow write: if adminImageWrite();
+    }
+
+    // ملفات المنتجات الخاصة
+    match /products/{id}/file/{file} {
+      allow read: if false;
+      allow write: if isAdmin() && (request.resource == null || request.resource.size < 100 * 1024 * 1024);
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

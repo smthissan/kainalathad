@@ -1,0 +1,117 @@
+rules_version = '2';
+
+// قواعد Firestore لموقع كيان للبرمجيات.
+// تطابق كل العمليات التي تنفذها الواجهة (index.html) ولوحة التحكم (admin.html)
+// ودوال Vercel (api/og.js و api/sitemap.js تقرأ المحتوى المنشور فقط بدون تسجيل دخول).
+// النشر: firebase deploy --only firestore:rules
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // نفس منطق لوحة التحكم والدالة السحابية: حساب إداري واحد بالبريد.
+    function isAdmin() {
+      return signedIn() && request.auth.token.email == 'smthysan@gmail.com';
+    }
+
+    function str(v, min, max) {
+      return v is string && v.size() >= min && v.size() <= max;
+    }
+
+    // ---------- المحتوى العام: الزوار يقرؤون المنشور فقط، والمدير يقرأ ويكتب الكل ----------
+    match /articles/{id} {
+      allow read: if resource.data.published == true || isAdmin();
+      allow write: if isAdmin();
+    }
+    match /services/{id} {
+      allow read: if resource.data.published == true || isAdmin();
+      allow write: if isAdmin();
+    }
+    match /portfolio/{id} {
+      allow read: if resource.data.published == true || isAdmin();
+      allow write: if isAdmin();
+    }
+    match /media/{id} {
+      allow read: if resource.data.published == true || isAdmin();
+      allow write: if isAdmin();
+    }
+    match /storeProducts/{id} {
+      allow read: if resource.data.published == true || isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // ---------- إعدادات الموقع ----------
+    match /siteSettings/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ---------- سجل نشاط الإدارة: إضافة وقراءة فقط، لا تعديل ولا حذف ----------
+    match /adminActivityLogs/{id} {
+      allow read, create: if isAdmin();
+      allow update, delete: if false;
+    }
+
+    // ---------- طلبات الشراء ----------
+    match /purchaseRequests/{id} {
+      allow read: if isAdmin()
+        || (signedIn() && resource.data.customerUid == request.auth.uid);
+
+      // العميل ينشئ طلباً لنفسه فقط، لمنتج منشور، وبسعره الحقيقي، وبحالة "جديد"
+      allow create: if signedIn() && validPurchase(request.resource.data);
+
+      // تغيير الحالة والحذف للمدير فقط
+      allow update, delete: if isAdmin();
+    }
+
+    function validPurchase(d) {
+      let product = get(/databases/$(database)/documents/storeProducts/$(d.productId)).data;
+      return d.keys().hasOnly(['customerUid', 'customerEmail', 'productId', 'productTitle', 'amount',
+                               'currency', 'country', 'company', 'message', 'status', 'createdAt'])
+        && d.keys().hasAll(['customerUid', 'productId', 'country', 'status', 'createdAt'])
+        && d.customerUid == request.auth.uid
+        && d.get('customerEmail', '') == request.auth.token.get('email', '')
+        && str(d.productId, 1, 200)
+        && exists(/databases/$(database)/documents/storeProducts/$(d.productId))
+        && product.published == true
+        && d.get('amount', null) == product.get('price', null)
+        && str(d.get('productTitle', ''), 0, 300)
+        && str(d.get('currency', ''), 0, 8)
+        && str(d.country, 2, 100)
+        && str(d.get('company', ''), 0, 200)
+        && str(d.get('message', ''), 0, 2000)
+        && d.status == 'new'
+        && d.createdAt == request.time;
+    }
+
+    // ---------- رسائل نموذج التواصل ----------
+    // أي زائر يرسل رسالة (بدون قراءة)، والمدير وحده يقرأ ويحدّث ويحذف
+    match /contactMessages/{id} {
+      allow create: if validContact(request.resource.data);
+      allow read, update, delete: if isAdmin();
+    }
+
+    function validContact(d) {
+      return d.keys().hasOnly(['name', 'email', 'phone', 'subject', 'message', 'status', 'createdAt', 'uid', 'page'])
+        && d.keys().hasAll(['name', 'email', 'message', 'status', 'createdAt'])
+        && str(d.name, 2, 100)
+        && str(d.email, 5, 200)
+        && d.email.matches('^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$')
+        && str(d.get('phone', ''), 0, 40)
+        && str(d.get('subject', ''), 0, 200)
+        && str(d.message, 10, 5000)
+        && str(d.get('page', ''), 0, 300)
+        && (!('uid' in d) || (signedIn() && d.uid == request.auth.uid))
+        && d.status == 'new'
+        && d.createdAt == request.time;
+    }
+
+    // أي مجموعة أخرى مغلقة افتراضياً
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

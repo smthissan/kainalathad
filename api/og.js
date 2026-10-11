@@ -97,6 +97,9 @@ export async function GET(request) {
     let img = String(doc.imageUrl || '').trim();
     if (img.startsWith('/')) img = origin + img;
     if (!/^https:\/\//.test(img)) img = '';
+    // بدون صورة خاصة: صورة المشاركة الافتراضية للموقع
+    const ownImg = !!img;
+    if (!img) img = `${origin}/og-default.png`;
 
     const tags =
       `<title>${esc(title)}</title>` +
@@ -107,11 +110,13 @@ export async function GET(request) {
       `<meta property="og:title" content="${esc(ogTitle)}">` +
       `<meta property="og:description" content="${esc(ogDesc)}">` +
       `<meta property="og:url" content="${esc(canonical)}">` +
-      (img ? `<meta property="og:image" content="${esc(img)}">` : '') +
-      `<meta name="twitter:card" content="${img ? 'summary_large_image' : 'summary'}">` +
+      `<meta property="og:image" content="${esc(img)}">` +
+      (ownImg ? '' : '<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">') +
+      `<meta property="og:image:alt" content="${esc(ogTitle)}">` +
+      `<meta name="twitter:card" content="summary_large_image">` +
       `<meta name="twitter:title" content="${esc(ogTitle)}">` +
       `<meta name="twitter:description" content="${esc(ogDesc)}">` +
-      (img ? `<meta name="twitter:image" content="${esc(img)}">` : '');
+      `<meta name="twitter:image" content="${esc(img)}">`;
 
     const page = original
       .replace(/<title>[\s\S]*?<\/title>/i, '')
