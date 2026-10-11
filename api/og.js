@@ -97,6 +97,11 @@ export async function GET(request) {
     let img = String(doc.imageUrl || '').trim();
     if (img.startsWith('/')) img = origin + img;
     if (!/^https:\/\//.test(img)) img = '';
+    // واتساب يتجاهل صور المعاينة الأكبر من ~300KB، فنمرر صور Firebase عبر خدمة الصور في Vercel
+    // (عرض 1200 وجودة 75) — مسموح بها في images.remotePatterns داخل vercel.json
+    if (img.startsWith('https://firebasestorage.googleapis.com/')) {
+      img = `${origin}/_vercel/image?url=${encodeURIComponent(img)}&w=1200&q=75`;
+    }
 
     const tags =
       `<title>${esc(title)}</title>` +

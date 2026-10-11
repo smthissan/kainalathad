@@ -1,5 +1,12 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "images": {
+    "sizes": [1200],
+    "remotePatterns": [
+      { "protocol": "https", "hostname": "firebasestorage.googleapis.com", "pathname": "/v0/b/kian-al-etihad.firebasestorage.app/**" }
+    ],
+    "minimumCacheTTL": 86400
+  },
   "rewrites": [
     {
       "source": "/:c(articles|services|portfolio|media)/:slug",
