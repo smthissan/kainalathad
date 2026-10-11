@@ -61,12 +61,30 @@ export async function GET(request) {
 
   // القالب الأصلي (index.html) — يُجلب من الملفات الثابتة للنشر نفسه
   const tplP = fetch(`${origin}/index.html`, { signal: AbortSignal.timeout(4000) });
-  const docP = COLLECTIONS.has(coll) && slug ? findDoc(coll, slug).catch(() => null) : Promise.resolve(null);
-  const tpl = await tplP;
-  const original = await tpl.text();
-  const headers = { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' };
+  // undefined = فشل الاتصال بـ Firestore، null = المستند غير موجود أو غير منشور
+  const docP = COLLECTIONS.has(coll) && slug ? findDoc(coll, slug).catch(() => undefined) : Promise.resolve(null);
+
+  // التخزين المؤقت في شبكة Vercel: النتيجة الناجحة 10 دقائق، و"غير موجود" دقيقة، والفشل لا يُخزَّن
+  const CACHE_OK = 'public, max-age=0, s-maxage=600, stale-while-revalidate=86400';
+  const CACHE_MISS = 'public, max-age=0, s-maxage=60';
+  const html = (body, cache) =>
+    new Response(body, { status: 200, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': cache } });
+
+  let original;
+  try {
+    const tpl = await tplP;
+    if (!tpl.ok) throw new Error(`template ${tpl.status}`);
+    original = await tpl.text();
+  } catch {
+    // بدون القالب لا توجد صفحة نعرضها؛ 503 تُفهم عند محركات البحث كخلل مؤقت
+    return new Response('Service temporarily unavailable', {
+      status: 503,
+      headers: { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store', 'retry-after': '120' },
+    });
+  }
   const doc = await docP;
-  if (!doc) return new Response(original, { status: 200, headers });
+  if (doc === undefined) return html(original, 'no-store');
+  if (!doc) return html(original, CACHE_MISS);
 
   try {
     const seo = doc.seo && typeof doc.seo === 'object' ? doc.seo : {};
@@ -95,13 +113,13 @@ export async function GET(request) {
       `<meta name="twitter:description" content="${esc(ogDesc)}">` +
       (img ? `<meta name="twitter:image" content="${esc(img)}">` : '');
 
-    const html = original
+    const page = original
       .replace(/<title>[\s\S]*?<\/title>/i, '')
       .replace(/<meta\s+(?:name|property)="(?:description|og:[a-z:_]+|twitter:[a-z:_]+)"[^>]*>/gi, '')
       .replace(/<link\s+rel="canonical"[^>]*>/i, '')
       .replace('</head>', tags + '</head>');
-    return new Response(html, { status: 200, headers });
+    return html(page, CACHE_OK);
   } catch {
-    return new Response(original, { status: 200, headers });
+    return html(original, 'no-store');
   }
 }
