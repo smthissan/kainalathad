@@ -53,6 +53,8 @@ Flat isometric vector illustration, modern tech editorial style, 16:9 landscape.
 Strictly no text of any kind, no letters, no Arabic script, no numbers, no watermark, no logos or brand marks, no trademarks, no human faces, no hands, no photorealism, no clutter, no thick black outlines.
 ```
 
+**قاعدة قانونية ثابتة لكل الصور:** لا شعارات ولا أسماء ولا رموز لأي علامة تجارية داخل الرسم، مثل Flutter وDart وAndroid وApple وGoogle وFirebase وPython وJavaScript وHTML وCSS وووردبريس وشوبيفاي. نستخدم رموزاً عامة فقط (هاتف، حاسوب، متجر، سهم رفع، علم). والغلافان الحاليان للدرسين 8 و9 مرسومان بالكامل من ملفات SVG في `content/tools/covers/` بلا أي شعار، ويُركَّب عليهما النص بـ`retype_cover.py --no-erase`. وإن ولّدت صورة بأداة ذكاء اصطناعي فراجع شروط الاستخدام التجاري لتلك الأداة قبل النشر، وافحص الصورة بعينك بحثاً عن شعار تسلل إليها.
+
 الصيغة النهائية لكل صورة = **البرومبت الأساسي + مشهد الدرس + قائمة الممنوعات**.
 
 ## 5) طبقات النص (على لوحة 1200×630)

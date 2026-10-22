@@ -58,7 +58,7 @@ async function newPage(opts = {}) {
       rows = rows.slice(0, sq.limit || 100);
       return r.fulfill({ contentType: 'application/json', body: JSON.stringify(rows.length ? rows.map(([id, o]) => ({ document: fsDoc(coll, id, sq.select ? Object.fromEntries(Object.entries(o).filter(([k]) => sq.select.fields.some(f => f.fieldPath === k))) : o) })) : [{ readTime: 'x' }]) });
     }
-    if (url.includes('/siteSettings/main')) return r.fulfill({ contentType: 'application/json', body: JSON.stringify({ fields: { social: { mapValue: { fields: { whatsapp: { stringValue: SETTINGS.social.whatsapp }, x: { stringValue: SETTINGS.social.x } } } }, heroButton: { stringValue: 'استكشف منتجاتنا' }, heroButtonUrl: { stringValue: '/products' }, productCategories: { mapValue: { fields: { templates: { mapValue: { fields: { title: { stringValue: 'قوالب جاهزة' }, description: { stringValue: 'وصف معدّل من اللوحة' } } } } } } } } }) });
+    if (url.includes('/siteSettings/main')) return r.fulfill({ contentType: 'application/json', body: JSON.stringify({ fields: { social: { mapValue: { fields: { whatsapp: { stringValue: SETTINGS.social.whatsapp }, x: { stringValue: SETTINGS.social.x } } } }, sectionOrder: { arrayValue: { values: ['hero', 'services', 'products', 'articles', 'media', 'about', 'account'].map(v => ({ stringValue: v })) } }, heroButton: { stringValue: 'استكشف منتجاتنا' }, heroButtonUrl: { stringValue: '/products' }, productCategories: { mapValue: { fields: { templates: { mapValue: { fields: { title: { stringValue: 'قوالب جاهزة' }, description: { stringValue: 'وصف معدّل من اللوحة' } } } } } } } } }) });
     return r.fulfill({ status: 404, body: '{}' });
   });
   const page = await ctx.newPage(); page.__errors = [];
@@ -171,6 +171,8 @@ DATA.articles.push(
 );
 { const p = await newPage(); await p.goto(B + '/'); await p.waitForSelector('#home-learn .card');
   ok((await p.$$('#home-learn .card')).length === 3 && await p.$('#learn-title + a.more[href="/learn"]'), 'home academy section lists the lessons'); ok(await p.$eval('#home-learn .card img', e => e.classList.contains('wide')), 'home academy cards use the uncropped cover');
+  { const order = await p.evaluate(() => { const pos = id => { const e = document.getElementById(id); return e ? [...document.querySelectorAll('#app section')].indexOf(e.closest('section')) : -1; }; return [pos('home-products'), pos('home-learn'), pos('home-articles')]; });
+    ok(order[0] >= 0 && order[1] > order[0] && order[2] > order[1], 'a new section missing from the saved order is placed after its predecessor (academy right after products, before articles): ' + order.join(' < ')); }
   await p.goto(B + '/learn'); await p.waitForSelector('.learn-track');
   const heads = await p.$$eval('.learn-track h2', e => e.map(x => x.textContent)); ok(heads.join('|') === 'إنشاء المواقع|المتاجر الإلكترونية', 'academy shows only tracks that have lessons, in fixed order: ' + heads.join('|'));
   const hrefs = await p.$$eval('.learn-track .card a.btn', e => e.map(x => x.getAttribute('href'))); ok(hrefs.join('|') === '/articles/first-site-guide|/articles/second-site-guide|/articles/product-page-guide', 'lessons ordered oldest first inside a track; plain articles excluded: ' + hrefs.join('|'));
@@ -199,6 +201,19 @@ for (const mobile of [false, true]) { const p = await newPage({ mobile }); for (
 console.log('Static pages');
 { const p = await newPage(); for (const u of ['/about', '/services', '/services/design', '/portfolio', '/no-such-page']) { await p.goto(B + u); await p.waitForTimeout(400); }
   ok(p.__errors.length === 0, 'no errors on static pages: ' + p.__errors.join(' | ')); }
+
+console.log('Legal pages');
+for (const [u, h] of [['/privacy', 'سياسة الخصوصية'], ['/terms', 'الشروط والأحكام'], ['/refund', 'سياسة الاسترجاع']]) {
+  const p = await newPage(); await p.goto(B + u); await p.waitForSelector('#legal-body.content-body h2', { timeout: 8000 });
+  ok((await p.textContent('h1')) === h, u + ': h1 is ' + h);
+  const body = await p.textContent('#legal-body');
+  ok(body.length > 1200 && !/[\[\]]\*?\*?(?:الاسم|البريد|التاريخ|البلد)/.test(body), u + ': full text, no unfilled placeholders');
+  ok((await p.title()).includes(h), u + ': title');
+  ok(p.__errors.length === 0, u + ': no errors ' + p.__errors.join('|'));
+  await p.close();
+}
+{ const p = await newPage(); await p.goto(B + '/'); await p.waitForSelector('footer .flinks');
+  ok((await p.$$eval('footer .flinks a', e => e.map(x => x.getAttribute('href')))).join() === '/privacy,/terms,/refund', 'footer links to the three legal pages'); }
 
 await browser.close(); server.close();
 console.log(failures ? `\n${failures} FAILED` : '\nALL PASSED'); process.exit(failures ? 1 : 0);

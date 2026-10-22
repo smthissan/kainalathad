@@ -18,6 +18,8 @@ sys.path.insert(0, os.path.join(HERE, 'retype'))
 from plate import clean_plate
 
 ap = argparse.ArgumentParser(); ap.add_argument('lesson', type=int); ap.add_argument('src'); ap.add_argument('--limit', type=int, required=True)
+ap.add_argument('--also', action='append', default=[], help='x0,y0,x1,y1 منطقة إضافية يجوز مسحها (نص يبدأ قبل --limit في صفوف لا يصلها الرسم)')
+ap.add_argument('--no-erase', action='store_true', help='الصورة المصدر رسم بلا نص (مثل covers/*.svg بعد تحويلها): لا يُمسح شيء، يُركَّب النص فوقها مباشرة')
 ap.add_argument('--out', default=os.path.join(ROOT, 'academy-import', 'covers')); a = ap.parse_args()
 folder = glob.glob(os.path.join(ROOT, 'content', 'ready-to-paste', '%02d-*' % a.lesson))[0]
 rd = lambda p: open(glob.glob(os.path.join(folder, p + '*'))[0], encoding='utf-8').read()
@@ -34,7 +36,8 @@ with tempfile.TemporaryDirectory() as t:
     json.dump(cfg, open(os.path.join(t, 'cfg.json'), 'w'), ensure_ascii=False)
     subprocess.run(['node', os.path.join(HERE, 'retype', 'layer.mjs'), os.path.join(t, 'cfg.json'), t], check=True, stdout=subprocess.DEVNULL)
     rep = json.load(open(os.path.join(t, 'report.json')))['x']
-    plate, _ = clean_plate(im, a.limit + 5, int(H * .10), int(H * .80))
+    rects = [(a.limit + 5, int(H * .10), W, int(H * .80))] + [tuple(int(v) for v in r.split(',')) for r in a.also]
+    plate = im if a.no_erase else clean_plate(im, rects)[0]
     out = plate.convert('RGBA'); out.alpha_composite(Image.open(os.path.join(t, 'layer-x.png')).convert('RGBA'))
 os.makedirs(a.out, exist_ok=True); dst = os.path.join(a.out, slug + '.jpg')
 out.convert('RGB').resize((1200, 630), Image.LANCZOS).save(dst, quality=86, optimize=True, progressive=True)
