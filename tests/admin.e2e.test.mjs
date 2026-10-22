@@ -9,7 +9,7 @@ const mods = {
   'firebase-auth.js': `export const getAuth=()=>({});export const signInWithEmailAndPassword=async()=>{},signOut=async()=>{};export function onAuthStateChanged(a,cb){setTimeout(()=>cb({uid:'adm',email:'smthysan@gmail.com'}),0)}`,
   'firebase-firestore.js': `globalThis.__ops=[];const MSGS=[{id:'m1',d:{name:'أحمد',email:'a@b.co',phone:'+9677',subject:'موقع',message:'أريد موقعاً\\nسطر 2',status:'new',createdAt:${ts('2026-10-10T10:00:00Z')}}},{id:'m2',d:{name:'<b>x</b>',email:'x@y.z',message:'تمت',status:'replied',createdAt:${ts('2026-10-09T10:00:00Z')}}}];
 export const getFirestore=()=>({}),collection=(db,n)=>({n}),doc=(db,c,i)=>({c,i}),query=(c)=>c,limit=()=>0,orderBy=()=>0,serverTimestamp=()=>'ST';
-const LISTS={storeProducts:[{id:'p1',d:{title:'قالب متجر',slug:'store-template',published:true}},{id:'p2',d:{title:'منتج مسودة',slug:'draft-prod',published:false}}],services:[{id:'s1',d:{title:'تطوير تطبيقات',slug:'apps-svc',published:true}}],articles:[{id:'a1',d:{title:'درس قديم',slug:'old-lesson',published:true,track:'websites',relatedProduct:'gone-prod',relatedService:'web-development'}},{id:'e1',d:{title:'قديم',slug:'free-website-options',published:false,createdAt:'2026-01-01T00:00:00Z',imageUrl:'https://img.example/old.jpg',imagePath:'articles/e1/preview/old'}}]};
+const LISTS={subscribers:[{id:'s1@x.co',d:{email:'s1@x.co',source:'article',status:'active',createdAt:${ts('2026-10-11T10:00:00Z')}}},{id:'=cmd@x.co',d:{email:'=cmd@x.co',source:'tool',status:'active',createdAt:${ts('2026-10-12T10:00:00Z')}}},{id:'old@x.co',d:{email:'old@x.co',source:'learn',status:'unsubscribed',createdAt:${ts('2026-10-01T10:00:00Z')}}}],storeProducts:[{id:'p1',d:{title:'قالب متجر',slug:'store-template',published:true}},{id:'p2',d:{title:'منتج مسودة',slug:'draft-prod',published:false}}],services:[{id:'s1',d:{title:'تطوير تطبيقات',slug:'apps-svc',published:true}}],articles:[{id:'a1',d:{title:'درس قديم',slug:'old-lesson',published:true,track:'websites',relatedProduct:'gone-prod',relatedService:'web-development'}},{id:'e1',d:{title:'قديم',slug:'free-website-options',published:false,createdAt:'2026-01-01T00:00:00Z',imageUrl:'https://img.example/old.jpg',imagePath:'articles/e1/preview/old'}}]};
 export async function getDocs(c){const docs=c.n==='contactMessages'?MSGS.filter(m=>!globalThis.__deleted?.includes(m.id)).map(m=>({id:m.id,data:()=>m.d})):(LISTS[c.n]||[]).map(m=>({id:m.id,data:()=>m.d}));return {docs,empty:!docs.length,forEach:f=>docs.forEach(f)}}
 export async function getDoc(){return {data:()=>({}),exists:()=>true}}
 export async function updateDoc(r,d){__ops.push(['update',r.c,r.i,d.status]);const m=MSGS.find(x=>x.id===r.i);if(m)m.d.status=d.status}
@@ -34,6 +34,12 @@ ok(JSON.stringify(await p.evaluate(() => __ops)).includes('["update","contactMes
 ok((await p.textContent('#messages-count')) === '', 'counter cleared after read');
 await (await (await p.$$('#messages .item'))[1].$('button.danger')).click(); await p.waitForTimeout(300);
 ok((await p.$$('#messages .item')).length === 1, 'delete works');
+console.log('Subscribers');
+ok((await p.textContent('#subs-count')).includes('2 نشط من 3'), 'subscriber count: ' + await p.textContent('#subs-count'));
+ok((await p.$$('#subs .item')).length === 2, 'default filter shows active only');
+{ const [dl] = await Promise.all([p.waitForEvent('download'), p.click('#export-subs')]); const fsm = await import('fs'); const csv = fsm.readFileSync(await dl.path(), 'utf8');
+  ok(csv.startsWith('\ufeffemail,source,subscribed_at') && csv.includes('"s1@x.co","article"') && csv.includes('"\'=cmd@x.co"') && !csv.includes('old@x.co'), 'CSV: BOM, active only, formula-injection escaped: ' + JSON.stringify(csv)); }
+
 ok((await p.textContent('#dashboard')).includes('يدعم تنسيق Markdown'), 'markdown hint visible');
 console.log('Private file upload');
 const PDF = Buffer.from('%PDF-1.7\n%âãÏÓ\n1 0 obj\n<<>>\nendobj\n');
