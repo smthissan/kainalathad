@@ -202,5 +202,18 @@ console.log('Static pages');
 { const p = await newPage(); for (const u of ['/about', '/services', '/services/design', '/portfolio', '/no-such-page']) { await p.goto(B + u); await p.waitForTimeout(400); }
   ok(p.__errors.length === 0, 'no errors on static pages: ' + p.__errors.join(' | ')); }
 
+console.log('Legal pages');
+for (const [u, h] of [['/privacy', 'سياسة الخصوصية'], ['/terms', 'الشروط والأحكام'], ['/refund', 'سياسة الاسترجاع']]) {
+  const p = await newPage(); await p.goto(B + u); await p.waitForSelector('#legal-body.content-body h2', { timeout: 8000 });
+  ok((await p.textContent('h1')) === h, u + ': h1 is ' + h);
+  const body = await p.textContent('#legal-body');
+  ok(body.length > 1200 && !/[\[\]]\*?\*?(?:الاسم|البريد|التاريخ|البلد)/.test(body), u + ': full text, no unfilled placeholders');
+  ok((await p.title()).includes(h), u + ': title');
+  ok(p.__errors.length === 0, u + ': no errors ' + p.__errors.join('|'));
+  await p.close();
+}
+{ const p = await newPage(); await p.goto(B + '/'); await p.waitForSelector('footer .flinks');
+  ok((await p.$$eval('footer .flinks a', e => e.map(x => x.getAttribute('href')))).join() === '/privacy,/terms,/refund', 'footer links to the three legal pages'); }
+
 await browser.close(); server.close();
 console.log(failures ? `\n${failures} FAILED` : '\nALL PASSED'); process.exit(failures ? 1 : 0);
