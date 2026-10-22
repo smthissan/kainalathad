@@ -22,12 +22,10 @@ const STATIC_PAGES = [
   ['/services/app-development', 'monthly', '0.8'],
   ['/services/software-development', 'monthly', '0.8'],
   ['/services/design', 'monthly', '0.8'],
-  ['/products/apps', 'weekly', '0.8'],
-  ['/products/templates', 'weekly', '0.8'],
-  ['/products/scripts', 'weekly', '0.8'],
-  ['/products/ebooks', 'weekly', '0.7'],
-  ['/products/design-resources', 'weekly', '0.7'],
 ];
+
+// صفحات أقسام المنتجات: تُضاف فقط إذا كان في القسم منتج منشور (الصفحة الفارغة تضر بالسيو)
+const CATEGORY_PAGES = ['ebooks', 'scripts', 'design-resources', 'apps', 'templates'];
 
 // [المجموعة في Firestore, بادئة الرابط في الموقع, changefreq, priority]
 const COLLECTIONS = [
@@ -47,7 +45,7 @@ async function listPublished(coll) {
     structuredQuery: {
       from: [{ collectionId: coll }],
       where: { fieldFilter: { field: { fieldPath: 'published' }, op: 'EQUAL', value: { booleanValue: true } } },
-      select: { fields: [{ fieldPath: 'slug' }] },
+      select: { fields: [{ fieldPath: 'slug' }, { fieldPath: 'category' }] },
       limit: MAX_PER_COLLECTION,
     },
   };
@@ -65,6 +63,7 @@ async function listPublished(coll) {
       // نفس منطق الواجهة: slug إن وُجد وإلا معرّف المستند
       slug: String(x.document.fields?.slug?.stringValue || '').trim() || x.document.name.split('/').pop(),
       updated: x.document.updateTime,
+      category: String(x.document.fields?.category?.stringValue || '').trim(),
     }));
 }
 
@@ -81,8 +80,12 @@ export async function GET() {
   const results = await Promise.allSettled(COLLECTIONS.map(([coll]) => listPublished(coll)));
 
   // الصفحات الثابتة لها الأولوية في الواجهة (مثل /services/design و/products/apps)، فلا تُكرَّر
-  const seen = new Set(STATIC_PAGES.map(([p]) => p));
+  const seen = new Set([...STATIC_PAGES.map(([p]) => p), ...CATEGORY_PAGES.map((c) => `/products/${c}`)]);
   const urls = STATIC_PAGES.map(([p, f, pr]) => urlTag(p, f, pr, ''));
+  // إذا فشل جلب المنتجات تُضاف كل الأقسام احتياطاً
+  const products = results[COLLECTIONS.findIndex(([c]) => c === 'storeProducts')];
+  const usedCats = products.status === 'fulfilled' ? new Set(products.value.map((p) => p.category)) : new Set(CATEGORY_PAGES);
+  for (const c of CATEGORY_PAGES) if (usedCats.has(c)) urls.push(urlTag(`/products/${c}`, 'weekly', '0.7', ''));
   let failed = false;
 
   results.forEach((res, i) => {

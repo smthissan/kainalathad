@@ -13,7 +13,7 @@ export async function getDocs(c){const docs=c.n==='contactMessages'?MSGS.filter(
 export async function getDoc(){return {data:()=>({}),exists:()=>true}}
 export async function updateDoc(r,d){__ops.push(['update',r.c,r.i,d.status]);const m=MSGS.find(x=>x.id===r.i);if(m)m.d.status=d.status}
 export async function deleteDoc(r){__ops.push(['delete',r.c,r.i]);(globalThis.__deleted||=[]).push(r.i)}
-export async function setDoc(r,d){__ops.push(['set',r.c,d.fileContentType,d.privateFilePath])} export async function addDoc(c,d){__ops.push(['add',c.n,d.action])}`,
+export async function setDoc(r,d){__ops.push(['set',r.c,d.fileContentType,d.privateFilePath,d.productCategories?JSON.stringify(d.productCategories):undefined])} export async function addDoc(c,d){__ops.push(['add',c.n,d.action])}`,
 };
 const b = await chromium.launch(); const p = await b.newPage({ viewport: { width: 1200, height: 900 } }); const errs = [];
 p.on('pageerror', e => errs.push(e.message)); p.on('dialog', d => d.accept());
@@ -48,7 +48,15 @@ for (const [label, file] of [['PDF reported as octet-stream', { name: 'book.pdf'
   ok(r.msg.includes('fake.pdf') && !r.ops.some(o => o[0] === 'upload' || o[0] === 'set'), 'non-PDF content renamed .pdf → rejected, nothing saved: ' + r.msg); }
 { const r = await saveProduct({ name: 'app.apk', mimeType: '', buffer: Buffer.from([0x50, 0x4b, 0x03, 0x04, 0, 0, 0, 0]) }); const up = r.ops.find(o => o[0] === 'upload');
   ok(up && up[1].endsWith('.apk') && up[2] === 'application/vnd.android.package-archive', 'APK still accepted'); }
+console.log('Product categories');
+ok((await p.$$('#cats .item')).length === 5, 'five product categories editable');
+await p.evaluate(() => { __ops.length = 0; }); await p.fill('#cat-title-ebooks', 'كتب تعليمية'); await p.check('#cat-hidden-scripts'); await p.click('#save-cats'); await p.waitForTimeout(300);
+{ const set = (await p.evaluate(() => __ops)).find(o => o[0] === 'set' && o[1] === 'siteSettings'); const c = set && JSON.parse(set[4]);
+  ok(c?.ebooks?.title === 'كتب تعليمية' && c?.scripts?.hidden === true && c?.templates?.hidden === false && (await p.textContent('#cats-msg')).includes('تم'), 'category settings saved to siteSettings'); }
+await (await (await p.$$('#cats .item'))[0].$('button')).click(); await p.waitForTimeout(200);
+ok(await p.inputValue('#kind') === 'storeProducts' && await p.inputValue('#category') === 'ebooks' && await p.inputValue('#productType') === 'Ebook', '"add product in this category" pre-fills the form');
 ok(errs.length === 0, 'no page errors ' + errs.join('|'));
 await p.screenshot({ path: OUT + '/admin.png', fullPage: false, clip: { x: 0, y: 0, width: 1200, height: 900 } });
 await p.evaluate(() => document.getElementById('messages').scrollIntoView()); await p.screenshot({ path: OUT + '/admin-msgs.png' });
+await p.evaluate(() => document.getElementById('cats-panel').scrollIntoView()); await p.screenshot({ path: OUT + '/admin-cats.png' });
 await b.close(); server.close(); console.log(fail ? fail + ' FAILED' : 'ALL PASSED');

@@ -58,7 +58,7 @@ async function newPage(opts = {}) {
       rows = rows.slice(0, sq.limit || 100);
       return r.fulfill({ contentType: 'application/json', body: JSON.stringify(rows.length ? rows.map(([id, o]) => ({ document: fsDoc(coll, id, o) })) : [{ readTime: 'x' }]) });
     }
-    if (url.includes('/siteSettings/main')) return r.fulfill({ contentType: 'application/json', body: JSON.stringify({ fields: { social: { mapValue: { fields: { whatsapp: { stringValue: SETTINGS.social.whatsapp }, x: { stringValue: SETTINGS.social.x } } } }, heroButton: { stringValue: 'استكشف منتجاتنا' }, heroButtonUrl: { stringValue: '/products' } } }) });
+    if (url.includes('/siteSettings/main')) return r.fulfill({ contentType: 'application/json', body: JSON.stringify({ fields: { social: { mapValue: { fields: { whatsapp: { stringValue: SETTINGS.social.whatsapp }, x: { stringValue: SETTINGS.social.x } } } }, heroButton: { stringValue: 'استكشف منتجاتنا' }, heroButtonUrl: { stringValue: '/products' }, productCategories: { mapValue: { fields: { templates: { mapValue: { fields: { title: { stringValue: 'قوالب جاهزة' }, description: { stringValue: 'وصف معدّل من اللوحة' } } } } } } } } }) });
     return r.fulfill({ status: 404, body: '{}' });
   });
   const page = await ctx.newPage(); page.__errors = [];
@@ -88,9 +88,11 @@ console.log('Portfolio');
   ok(p.__errors.length === 0, 'no errors: ' + p.__errors.join(' | ')); }
 
 console.log('Products page');
-{ const p = await newPage(); await p.goto(B + '/products'); await p.waitForSelector('#category-products .card'); ok(await p.$('#category-products a[href="/products/store-template"]') && await p.$('a[href="/products/ebooks"]'), 'products page: categories + all products');
+{ const p = await newPage(); await p.goto(B + '/products'); await p.waitForSelector('#products-by-cat .card'); ok(await p.$('#products-by-cat a[href="/products/store-template"]'), 'products page lists product under its category');
+  const heads = await p.$$eval('#products-by-cat h2', e => e.map(x => x.textContent)); ok(heads.length === 1 && heads[0] === 'قوالب جاهزة' && (await p.textContent('#products-by-cat')).includes('وصف معدّل من اللوحة'), 'only non-empty categories shown, with admin-edited name: ' + heads.join(','));
+  await p.goto(B + '/products/templates'); await p.waitForSelector('#category-products .card'); ok((await p.textContent('h1')) === 'قوالب جاهزة', 'category page uses edited name');
   ok(p.__errors.length === 0, 'no errors: ' + p.__errors.join(' | '));
-  const m = await newPage({ mobile: true }); await m.goto(B + '/products'); await m.waitForSelector('#category-products .card'); ok(await m.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'no horizontal overflow mobile /products (6-item bottom bar)'); await m.screenshot({ path: OUT + '/products-mobile.png' }); }
+  const m = await newPage({ mobile: true }); await m.goto(B + '/products'); await m.waitForSelector('#products-by-cat .card'); ok(await m.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'no horizontal overflow mobile /products (6-item bottom bar)'); await m.screenshot({ path: OUT + '/products-mobile.png' }); }
 
 console.log('Article');
 { const p = await newPage(); await p.goto(B + '/articles/build-site'); await p.waitForSelector('.content-body.md h2');
