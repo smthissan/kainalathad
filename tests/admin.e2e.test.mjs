@@ -19,7 +19,7 @@ export async function setDoc(r,d){__ops.push(['set',r.c,d.fileContentType,d.priv
 const b = await chromium.launch(); const p = await b.newPage({ viewport: { width: 1200, height: 900 } }); const errs = [];
 p.on('pageerror', e => errs.push(e.message)); p.on('dialog', d => d.accept());
 await p.route('https://www.gstatic.com/**', r => r.fulfill({ contentType: 'text/javascript', body: mods[r.request().url().split('/').pop()] }));
-const BUNDLE = JSON.parse(fs.readFileSync(new URL('../academy-import/bundle.json', import.meta.url), 'utf8')); let BUNDLE_SERVED = JSON.parse(JSON.stringify(BUNDLE)), BUNDLE_STATUS = 200; const IMG = Buffer.from('JPEGDATA');
+const BUNDLE = JSON.parse(fs.readFileSync(new URL('../academy-import/bundle.json', import.meta.url), 'utf8')); let BUNDLE_SERVED = JSON.parse(JSON.stringify(BUNDLE)), BUNDLE_STATUS = 200; BUNDLE_SERVED.lessons.forEach(l => delete l.cover); const IMG = Buffer.from('JPEGDATA');
 await p.route('**/academy-import/**', r => { const u = r.request().url(); if (u.endsWith('/bundle.json')) return BUNDLE_STATUS === 200 ? r.fulfill({ contentType: 'application/json', body: JSON.stringify(BUNDLE_SERVED) }) : r.fulfill({ status: BUNDLE_STATUS, body: 'x' }); if (u.includes('/covers/')) return r.fulfill({ contentType: 'image/jpeg', body: IMG }); return r.fulfill({ status: 404, body: '' }); });
 let fail = 0; const ok = (c, m) => { console.log((c ? '  ✔ ' : '  ✘ ') + m); if (!c) fail++; };
 await p.goto('http://localhost:4174/'); await p.waitForSelector('#messages .item');
@@ -73,6 +73,11 @@ await (await (await p.$$('#items .item'))[0].$('button')).click(); await p.waitF
 ok(await p.inputValue('#track') === 'websites' && await p.inputValue('#relService') === 'web-development' && await p.inputValue('#relProduct') === 'gone-prod' && (await p.$eval('#relProduct', e => e.selectedOptions[0].textContent)).includes('غير موجود'), 'editing a lesson restores its fields (a deleted product stays selected, flagged)');
 await p.selectOption('#kind', 'storeProducts'); await p.waitForTimeout(200);
 ok(!(await p.isVisible('#track')) && !(await p.isVisible('#relProduct')), 'lesson fields hidden for other content types');
+// the cover files registered in the real bundle must exist and respect the spec (JPEG 1200x630, under 250KB)
+{ const dims = buf => { let i = 2; while (i < buf.length) { if (buf[i] !== 0xFF) { i++; continue } const m = buf[i + 1]; if (m >= 0xC0 && m <= 0xC3) return [buf.readUInt16BE(i + 7), buf.readUInt16BE(i + 5)]; i += 2 + buf.readUInt16BE(i + 2); } return null; };
+  const covers = BUNDLE.lessons.filter(l => l.cover); const bad = [];
+  for (const l of covers) { const f = new URL('../academy-import/' + l.cover, import.meta.url); if (!fs.existsSync(f)) { bad.push(l.slug + ': missing'); continue } const buf = fs.readFileSync(f), d = dims(buf); if (buf[0] !== 0xFF || buf[1] !== 0xD8 || !d || d[0] !== 1200 || d[1] !== 630 || buf.length > 250 * 1024) bad.push(`${l.slug}: ${d && d.join('x')} ${Math.round(buf.length / 1024)}KB`); if (!l.cover.startsWith('covers/' + l.slug + '.')) bad.push(l.slug + ': cover name does not match slug'); }
+  ok(covers.length >= 1 && bad.length === 0, `real cover files: ${covers.length} registered, all JPEG 1200x630 under 250KB, named by slug` + (bad.length ? ' — PROBLEMS: ' + bad.join('; ') : '')); }
 console.log('Import panel');
 await p.waitForSelector('#import-list .item');
 { const rows = await p.$$eval('#import-list .item', e => e.map(x => x.textContent));

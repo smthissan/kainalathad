@@ -165,16 +165,18 @@ console.log('Account');
 
 console.log('Academy');
 DATA.articles.push(
-  ['l1', { title: 'دليل بناء موقعك الأول', slug: 'first-site-guide', description: 'درس في المواقع', track: 'websites', relatedProduct: 'store-template', relatedService: 'web-development', published: true, createdAt: new Date('2026-09-01T10:00:00Z'), content: '# مقدمة\nنص الدرس الأول' }],
+  ['l1', { title: 'دليل بناء موقعك الأول', slug: 'first-site-guide', description: 'درس في المواقع', track: 'websites', relatedProduct: 'store-template', relatedService: 'web-development', imageUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', published: true, createdAt: new Date('2026-09-01T10:00:00Z'), content: '# مقدمة\nنص الدرس الأول' }],
   ['l2', { title: 'أسرار صفحة المنتج', slug: 'product-page-guide', description: 'درس في المتاجر', track: 'stores', relatedService: 'web', published: true, createdAt: new Date('2026-09-02T10:00:00Z'), content: 'نص الدرس' }],
-  ['l3', { title: 'درس ثانٍ في المواقع', slug: 'second-site-guide', description: 'متابعة', track: 'websites', published: true, createdAt: new Date('2026-09-03T10:00:00Z'), content: 'نص' }],
+  ['l3', { title: 'درس ثانٍ في المواقع', slug: 'second-site-guide', description: 'متابعة', track: 'websites', imageUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', published: true, createdAt: new Date('2026-09-03T10:00:00Z'), content: 'نص' }],
 );
 { const p = await newPage(); await p.goto(B + '/'); await p.waitForSelector('#home-learn .card');
-  ok((await p.$$('#home-learn .card')).length === 3 && await p.$('#learn-title + a.more[href="/learn"]'), 'home academy section lists the lessons');
+  ok((await p.$$('#home-learn .card')).length === 3 && await p.$('#learn-title + a.more[href="/learn"]'), 'home academy section lists the lessons'); ok(await p.$eval('#home-learn .card img', e => e.classList.contains('wide')), 'home academy cards use the uncropped cover');
   await p.goto(B + '/learn'); await p.waitForSelector('.learn-track');
   const heads = await p.$$eval('.learn-track h2', e => e.map(x => x.textContent)); ok(heads.join('|') === 'إنشاء المواقع|المتاجر الإلكترونية', 'academy shows only tracks that have lessons, in fixed order: ' + heads.join('|'));
   const hrefs = await p.$$eval('.learn-track .card a.btn', e => e.map(x => x.getAttribute('href'))); ok(hrefs.join('|') === '/articles/first-site-guide|/articles/second-site-guide|/articles/product-page-guide', 'lessons ordered oldest first inside a track; plain articles excluded: ' + hrefs.join('|'));
   ok((await p.title()).includes('الأكاديمية') && await p.getAttribute('meta[name=robots]', 'content') !== 'noindex,follow', 'academy page title + indexable');
+  { const ratios = await p.$$eval('.learn-track .card img', e => e.map(x => { const r = x.getBoundingClientRect(); return [x.classList.contains('wide'), Math.round(r.width / r.height * 100) / 100]; }));
+    ok(ratios.length === 2 && ratios.every(([w, r]) => w && Math.abs(r - 1.9) < 0.02), 'lesson covers show whole (1.9:1, not cropped to 16:10) in academy cards: ' + JSON.stringify(ratios)); }
   await p.goto(B + '/learn/websites'); await p.waitForSelector('.grid .card'); ok((await p.$$('.grid .card')).length === 2 && (await p.textContent('h1')) === 'إنشاء المواقع', 'track page lists only its lessons');
   ok((await p.textContent('.crumbs')).includes('الأكاديمية') && await p.$('.crumbs a[href="/learn"]') && await p.$('.learn-more a[href="/learn/stores"]'), 'track page: breadcrumbs + links to the other tracks');
   for (const u of ['/learn/apps', '/learn/no-such-track']) { await p.goto(B + u); await p.waitForSelector('.notice'); ok((await p.textContent('h1')) === 'الصفحة غير موجودة' && await p.getAttribute('meta[name=robots]', 'content') === 'noindex,nofollow', u + ' → not found + noindex (empty or unknown track)'); }
@@ -184,7 +186,7 @@ DATA.articles.push(
   ok(cards.length === 2 && cards[0].h === '/products/store-template' && cards[0].t.includes('USD 25') && cards[1].h === '/services/web-development' && cards[1].t.includes('تطوير المواقع'), 'lesson shows next step: linked product (with price) + static service: ' + JSON.stringify(cards.map(c => c.h)));
   ok((await p.textContent('.crumbs')).replace(/\s+/g, ' ').includes('الأكاديمية / إنشاء المواقع / دليل بناء موقعك الأول') && await p.$('.crumbs a[href="/learn/websites"]'), 'lesson breadcrumbs go through the academy track');
   const ld = JSON.parse(await p.textContent('#schema')); ok(ld.breadcrumb?.itemListElement?.length === 4 && ld.breadcrumb.itemListElement[2].item.endsWith('/learn/websites'), 'lesson BreadcrumbList includes academy + track');
-  await p.waitForSelector('#related .card'); ok((await p.textContent('#related h2')) === 'دروس ذات صلة' && (await p.textContent('#related .card h3')) === 'درس ثانٍ في المواقع', 'related lessons: same track first');
+  await p.waitForSelector('#related .card'); ok(await p.$eval('#related .card img', e => e.classList.contains('wide')), 'related lessons use the uncropped cover too'); ok((await p.textContent('#related h2')) === 'دروس ذات صلة' && (await p.textContent('#related .card h3')) === 'درس ثانٍ في المواقع', 'related lessons: same track first');
   ok(p.__errors.length === 0, 'no errors: ' + p.__errors.join(' | ')); }
 { const p = await newPage(); await p.goto(B + '/articles/product-page-guide'); await p.waitForSelector('#next-step .card');
   ok((await p.$$('#next-step .card')).length === 1 && await p.$('#next-step a.btn[href="/services/web"]'), 'lesson linked to a database service'); }
