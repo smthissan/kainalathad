@@ -5,7 +5,8 @@
 const PROJECT = 'kian-al-etihad';
 const KEY = 'AIzaSyBBIT4gfDSQmYltoqW1V7Th6vefiGXg-bI'; // نفس مفتاح الواجهة العام
 const SITE = 'كيان للبرمجيات';
-const COLLECTIONS = new Set(['articles', 'services', 'portfolio', 'media']);
+// مسار الرابط في الموقع ← اسم المجموعة في Firestore
+const COLLECTIONS = { articles: 'articles', services: 'services', portfolio: 'portfolio', media: 'media', products: 'storeProducts' };
 const BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/(default)/documents`;
 
 const val = (v) => {
@@ -62,7 +63,7 @@ export async function GET(request) {
   // القالب الأصلي (index.html) — يُجلب من الملفات الثابتة للنشر نفسه
   const tplP = fetch(`${origin}/index.html`, { signal: AbortSignal.timeout(4000) });
   // undefined = فشل الاتصال بـ Firestore، null = المستند غير موجود أو غير منشور
-  const docP = COLLECTIONS.has(coll) && slug ? findDoc(coll, slug).catch(() => undefined) : Promise.resolve(null);
+  const docP = Object.hasOwn(COLLECTIONS, coll) && slug ? findDoc(COLLECTIONS[coll], slug).catch(() => undefined) : Promise.resolve(null);
 
   // التخزين المؤقت في شبكة Vercel: النتيجة الناجحة 10 دقائق، و"غير موجود" دقيقة، والفشل لا يُخزَّن
   const CACHE_OK = 'public, max-age=0, s-maxage=600, stale-while-revalidate=86400';
@@ -105,7 +106,7 @@ export async function GET(request) {
       `<title>${esc(title)}</title>` +
       `<meta name="description" content="${esc(desc)}">` +
       `<link rel="canonical" href="${esc(canonical)}">` +
-      `<meta property="og:type" content="${coll === 'articles' ? 'article' : 'website'}">` +
+      `<meta property="og:type" content="${coll === 'articles' ? 'article' : coll === 'products' ? 'product' : 'website'}">` +
       `<meta property="og:site_name" content="${esc(SITE)}">` +
       `<meta property="og:title" content="${esc(ogTitle)}">` +
       `<meta property="og:description" content="${esc(ogDesc)}">` +

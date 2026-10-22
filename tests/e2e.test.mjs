@@ -58,7 +58,7 @@ async function newPage(opts = {}) {
       rows = rows.slice(0, sq.limit || 100);
       return r.fulfill({ contentType: 'application/json', body: JSON.stringify(rows.length ? rows.map(([id, o]) => ({ document: fsDoc(coll, id, o) })) : [{ readTime: 'x' }]) });
     }
-    if (url.includes('/siteSettings/main')) return r.fulfill({ contentType: 'application/json', body: JSON.stringify({ fields: { social: { mapValue: { fields: { whatsapp: { stringValue: SETTINGS.social.whatsapp }, x: { stringValue: SETTINGS.social.x } } } } } }) });
+    if (url.includes('/siteSettings/main')) return r.fulfill({ contentType: 'application/json', body: JSON.stringify({ fields: { social: { mapValue: { fields: { whatsapp: { stringValue: SETTINGS.social.whatsapp }, x: { stringValue: SETTINGS.social.x } } } }, heroButton: { stringValue: 'استكشف منتجاتنا' }, heroButtonUrl: { stringValue: '/products' } } }) });
     return r.fulfill({ status: 404, body: '{}' });
   });
   const page = await ctx.newPage(); page.__errors = [];
@@ -75,6 +75,9 @@ console.log('Home');
   ok(await p.$('link[rel=manifest]') && await p.$('link[rel="apple-touch-icon"]'), 'manifest + apple icon linked');
   for (const a of ['/favicon.svg', '/favicon.ico', '/manifest.webmanifest', '/og-default.png', '/icon-512.png']) { const r = await p.request.get(B + a); ok(r.status() === 200 && !(await r.text()).startsWith('<!doctype'), 'asset served: ' + a); }
   const ld = JSON.parse(await p.textContent('#schema')); ok(ld.logo && ld.sameAs?.[0] === 'https://x.com/kian' && !ld.sameAs.some(s => s.includes('wa.me')), 'Organization schema has logo + sameAs');
+  await p.waitForSelector('#home-products .card'); ok(await p.$('#home-products a[href="/products/store-template"]') && (await p.textContent('#home-products')).includes('USD 25'), 'home shows real products with price');
+  ok(await p.getAttribute('#hero-button', 'href') === '/products' && (await p.textContent('#hero-button')) === 'استكشف منتجاتنا', 'hero button respects admin settings (/products)');
+  ok(await p.$('#navlinks a[href="/products"]') && await p.$('#tabbar a[href="/products"]'), 'products link in top menu + bottom bar');
   await p.waitForSelector('#home-media .card'); ok(await p.$('#home-media a[href="/portfolio/client-store"]') && await p.getAttribute('#media-title + a.more', 'href') === '/portfolio', 'portfolio items shown in home works section');
   ok(p.__errors.length === 0, 'no console/CSP errors: ' + p.__errors.join(' | '));
   await p.screenshot({ path: OUT + '/home.png' }); }
@@ -83,6 +86,11 @@ console.log('Portfolio');
 { const p = await newPage(); await p.goto(B + '/portfolio'); await p.waitForSelector('#portfolio-grid .card'); ok(await p.$('#portfolio-grid a[href="/portfolio/client-store"]'), 'portfolio page lists item');
   await p.goto(B + '/portfolio/client-store'); await p.waitForSelector('.content-body'); ok((await p.textContent('h1')).includes('متجر إلكتروني لعميل'), 'portfolio detail page');
   ok(p.__errors.length === 0, 'no errors: ' + p.__errors.join(' | ')); }
+
+console.log('Products page');
+{ const p = await newPage(); await p.goto(B + '/products'); await p.waitForSelector('#category-products .card'); ok(await p.$('#category-products a[href="/products/store-template"]') && await p.$('a[href="/products/ebooks"]'), 'products page: categories + all products');
+  ok(p.__errors.length === 0, 'no errors: ' + p.__errors.join(' | '));
+  const m = await newPage({ mobile: true }); await m.goto(B + '/products'); await m.waitForSelector('#category-products .card'); ok(await m.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'no horizontal overflow mobile /products (6-item bottom bar)'); await m.screenshot({ path: OUT + '/products-mobile.png' }); }
 
 console.log('Article');
 { const p = await newPage(); await p.goto(B + '/articles/build-site'); await p.waitForSelector('.content-body.md h2');
