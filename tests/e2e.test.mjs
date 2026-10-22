@@ -23,7 +23,7 @@ const DATA = {
     ['a3', { title: 'مقال في التصميم', slug: 'design-post', description: 'تصنيف آخر', category: 'design', published: true, createdAt: new Date('2026-09-15') }],
   ],
   services: [['s1', { title: 'تطوير المواقع', slug: 'web', description: 'مواقع سريعة', published: true }]],
-  media: [], portfolio: [],
+  media: [], portfolio: [['w1', { title: 'متجر إلكتروني لعميل', slug: 'client-store', description: 'مشروع منفذ', published: true, createdAt: new Date('2026-09-01') }]],
   storeProducts: [['p1', { title: 'قالب متجر', slug: 'store-template', description: 'قالب احترافي', content: 'وصف **المنتج**', price: 25, currency: 'USD', category: 'templates', published: true }]],
 };
 const SETTINGS = { social: { whatsapp: '+967700000000', x: 'https://x.com/kian' } };
@@ -75,8 +75,14 @@ console.log('Home');
   ok(await p.$('link[rel=manifest]') && await p.$('link[rel="apple-touch-icon"]'), 'manifest + apple icon linked');
   for (const a of ['/favicon.svg', '/favicon.ico', '/manifest.webmanifest', '/og-default.png', '/icon-512.png']) { const r = await p.request.get(B + a); ok(r.status() === 200 && !(await r.text()).startsWith('<!doctype'), 'asset served: ' + a); }
   const ld = JSON.parse(await p.textContent('#schema')); ok(ld.logo && ld.sameAs?.[0] === 'https://x.com/kian' && !ld.sameAs.some(s => s.includes('wa.me')), 'Organization schema has logo + sameAs');
+  await p.waitForSelector('#home-media .card'); ok(await p.$('#home-media a[href="/portfolio/client-store"]') && await p.getAttribute('#media-title + a.more', 'href') === '/portfolio', 'portfolio items shown in home works section');
   ok(p.__errors.length === 0, 'no console/CSP errors: ' + p.__errors.join(' | '));
   await p.screenshot({ path: OUT + '/home.png' }); }
+
+console.log('Portfolio');
+{ const p = await newPage(); await p.goto(B + '/portfolio'); await p.waitForSelector('#portfolio-grid .card'); ok(await p.$('#portfolio-grid a[href="/portfolio/client-store"]'), 'portfolio page lists item');
+  await p.goto(B + '/portfolio/client-store'); await p.waitForSelector('.content-body'); ok((await p.textContent('h1')).includes('متجر إلكتروني لعميل'), 'portfolio detail page');
+  ok(p.__errors.length === 0, 'no errors: ' + p.__errors.join(' | ')); }
 
 console.log('Article');
 { const p = await newPage(); await p.goto(B + '/articles/build-site'); await p.waitForSelector('.content-body.md h2');
