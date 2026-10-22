@@ -14,7 +14,7 @@ export async function getDocs(c){const docs=c.n==='contactMessages'?MSGS.filter(
 export async function getDoc(){return {data:()=>({}),exists:()=>true}}
 export async function updateDoc(r,d){__ops.push(['update',r.c,r.i,d.status]);const m=MSGS.find(x=>x.id===r.i);if(m)m.d.status=d.status}
 export async function deleteDoc(r){__ops.push(['delete',r.c,r.i]);(globalThis.__deleted||=[]).push(r.i)}
-export async function setDoc(r,d){__ops.push(['set',r.c,d.fileContentType,d.privateFilePath,d.productCategories?JSON.stringify(d.productCategories):undefined,d.track!==undefined?JSON.stringify({track:d.track,relatedProduct:d.relatedProduct,relatedService:d.relatedService}):undefined,JSON.stringify(d),r.i])} export async function addDoc(c,d){__ops.push(['add',c.n,d.action])}`,
+export async function setDoc(r,d){if(globalThis.__failSlug&&d.slug===globalThis.__failSlug){const e=new Error('Missing or insufficient permissions.');e.code='permission-denied';throw e}if(globalThis.__hangSlug&&d.slug===globalThis.__hangSlug)return new Promise(()=>{});__ops.push(['set',r.c,d.fileContentType,d.privateFilePath,d.productCategories?JSON.stringify(d.productCategories):undefined,d.track!==undefined?JSON.stringify({track:d.track,relatedProduct:d.relatedProduct,relatedService:d.relatedService}):undefined,JSON.stringify(d),r.i])} export async function addDoc(c,d){__ops.push(['add',c.n,d.action])}`,
 };
 const b = await chromium.launch(); const p = await b.newPage({ viewport: { width: 1200, height: 900 } }); const errs = [];
 p.on('pageerror', e => errs.push(e.message)); p.on('dialog', d => d.accept());
@@ -103,6 +103,18 @@ await p.check('#import-draft'); await p.evaluate(() => { __ops.length = 0; docum
 await p.setInputFiles('#import-images', []); await p.uncheck('#import-draft'); BUNDLE_SERVED.lessons[0].cover = 'covers/how-to-create-a-website-step-by-step.jpg'; await p.click('#import-reload'); await p.waitForFunction(() => document.getElementById('import-list').textContent.includes('من مجلد الحزمة'), null, { timeout: 5000 });
 await p.evaluate(() => { __ops.length = 0; document.getElementById('import-msg').textContent = ''; }); await p.click('#import-run'); await waitDone();
 { const ups = (await p.evaluate(() => __ops)).filter(o => o[0] === 'upload'); ok(ups.length === 1 && ups[0][2] === 'image/jpeg', 'a cover found in the bundle folder is uploaded automatically'); }
+// failures must be visible, must not stop the other lessons, and a stalled write must time out instead of hanging silently
+await p.setInputFiles('#import-images', []); await p.uncheck('#import-draft');
+{ const S = BUNDLE_SERVED.lessons.map(l => l.slug); BUNDLE_SERVED.lessons[2].track = BUNDLE.lessons[2].track; BUNDLE_STATUS = 200; await p.click('#import-reload'); await p.waitForFunction(() => !document.getElementById('import-run').disabled, null, { timeout: 5000 });
+  await p.evaluate(([f, h]) => { globalThis.__failSlug = f; globalThis.__hangSlug = h; globalThis.__importTimeout = 400; __ops.length = 0; document.getElementById('import-msg').textContent = ''; }, [S[2], S[3]]);
+  await p.click('#import-run'); await p.waitForFunction(() => /تم \d+ من 9/.test(document.getElementById('import-msg').textContent), null, { timeout: 8000 });
+  const log = await p.textContent('#import-msg'); const sets = (await p.evaluate(() => __ops)).filter(o => o[0] === 'set' && o[1] === 'articles');
+  ok(log.includes('تم 7 من 9') && sets.length === 7, 'two lessons fail, the other seven are still saved (the loop does not stop): ' + log.split('\n').filter(l => l.startsWith('✘')).length + ' failed');
+  ok(log.includes('✘') && log.includes('permission-denied') && log.includes('Missing or insufficient permissions'), 'a failure shows the lesson title, the error code and the message');
+  ok(log.includes('انتهت المهلة أثناء حفظ الدرس'), 'a write that never finishes times out with a clear message instead of hanging');
+  ok(await p.isVisible('#import-copy'), 'a copy-log button is available so the log can be sent for diagnosis');
+  await p.evaluate(() => { delete globalThis.__failSlug; delete globalThis.__hangSlug; __ops.length = 0; document.getElementById('import-msg').textContent = ''; }); await p.click('#import-run'); await p.waitForFunction(() => /تم \d+ من 9/.test(document.getElementById('import-msg').textContent), null, { timeout: 8000 });
+  ok((await p.textContent('#import-msg')).includes('تم 9 من 9'), 'retrying after the problem is fixed completes all nine'); }
 // broken / missing bundles
 BUNDLE_SERVED.lessons[2].track = 'no-such-track'; await p.click('#import-reload'); await p.waitForFunction(() => document.getElementById('import-msg').textContent.includes('غير صالح'), null, { timeout: 5000 });
 ok(await p.isDisabled('#import-run'), 'an invalid bundle is rejected and the import button is disabled');
