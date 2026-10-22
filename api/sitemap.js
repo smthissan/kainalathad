@@ -13,6 +13,7 @@ const STATIC_PAGES = [
   ['/', 'weekly', '1.0'],
   ['/services', 'weekly', '0.9'],
   ['/products', 'weekly', '0.9'],
+  ['/learn', 'weekly', '0.9'],
   ['/articles', 'weekly', '0.8'],
   ['/media', 'weekly', '0.8'],
   ['/portfolio', 'weekly', '0.9'],
@@ -26,6 +27,9 @@ const STATIC_PAGES = [
 
 // صفحات أقسام المنتجات: تُضاف فقط إذا كان في القسم منتج منشور (الصفحة الفارغة تضر بالسيو)
 const CATEGORY_PAGES = ['ebooks', 'scripts', 'design-resources', 'apps', 'templates'];
+
+// مسارات الأكاديمية (حقل track في المقالات): يُضاف المسار فقط إذا كان فيه درس منشور
+const LEARN_TRACKS = ['websites', 'stores', 'apps', 'ai', 'digital-products', 'programming'];
 
 // [المجموعة في Firestore, بادئة الرابط في الموقع, changefreq, priority]
 const COLLECTIONS = [
@@ -45,7 +49,7 @@ async function listPublished(coll) {
     structuredQuery: {
       from: [{ collectionId: coll }],
       where: { fieldFilter: { field: { fieldPath: 'published' }, op: 'EQUAL', value: { booleanValue: true } } },
-      select: { fields: [{ fieldPath: 'slug' }, { fieldPath: 'category' }] },
+      select: { fields: [{ fieldPath: 'slug' }, { fieldPath: 'category' }, { fieldPath: 'track' }] },
       limit: MAX_PER_COLLECTION,
     },
   };
@@ -64,6 +68,7 @@ async function listPublished(coll) {
       slug: String(x.document.fields?.slug?.stringValue || '').trim() || x.document.name.split('/').pop(),
       updated: x.document.updateTime,
       category: String(x.document.fields?.category?.stringValue || '').trim(),
+      track: String(x.document.fields?.track?.stringValue || '').trim(),
     }));
 }
 
@@ -80,12 +85,16 @@ export async function GET() {
   const results = await Promise.allSettled(COLLECTIONS.map(([coll]) => listPublished(coll)));
 
   // الصفحات الثابتة لها الأولوية في الواجهة (مثل /services/design و/products/apps)، فلا تُكرَّر
-  const seen = new Set([...STATIC_PAGES.map(([p]) => p), ...CATEGORY_PAGES.map((c) => `/products/${c}`)]);
+  const seen = new Set([...STATIC_PAGES.map(([p]) => p), ...CATEGORY_PAGES.map((c) => `/products/${c}`), ...LEARN_TRACKS.map((t) => `/learn/${t}`)]);
   const urls = STATIC_PAGES.map(([p, f, pr]) => urlTag(p, f, pr, ''));
   // إذا فشل جلب المنتجات تُضاف كل الأقسام احتياطاً
   const products = results[COLLECTIONS.findIndex(([c]) => c === 'storeProducts')];
   const usedCats = products.status === 'fulfilled' ? new Set(products.value.map((p) => p.category)) : new Set(CATEGORY_PAGES);
   for (const c of CATEGORY_PAGES) if (usedCats.has(c)) urls.push(urlTag(`/products/${c}`, 'weekly', '0.7', ''));
+  // إذا فشل جلب المقالات لا تُضاف صفحات المسارات (الصفحة الفارغة لا تُفهرَس)
+  const articles = results[COLLECTIONS.findIndex(([c]) => c === 'articles')];
+  const usedTracks = articles.status === 'fulfilled' ? new Set(articles.value.map((a) => a.track)) : new Set();
+  for (const t of LEARN_TRACKS) if (usedTracks.has(t)) urls.push(urlTag(`/learn/${t}`, 'weekly', '0.8', ''));
   let failed = false;
 
   results.forEach((res, i) => {
