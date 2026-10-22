@@ -1,4 +1,5 @@
 User-agent: *
 Allow: /
+Disallow: /academy-import/
 
 Sitemap: https://kianalathad.com/sitemap.xml

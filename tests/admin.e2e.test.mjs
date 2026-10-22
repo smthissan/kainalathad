@@ -9,16 +9,18 @@ const mods = {
   'firebase-auth.js': `export const getAuth=()=>({});export const signInWithEmailAndPassword=async()=>{},signOut=async()=>{};export function onAuthStateChanged(a,cb){setTimeout(()=>cb({uid:'adm',email:'smthysan@gmail.com'}),0)}`,
   'firebase-firestore.js': `globalThis.__ops=[];const MSGS=[{id:'m1',d:{name:'أحمد',email:'a@b.co',phone:'+9677',subject:'موقع',message:'أريد موقعاً\\nسطر 2',status:'new',createdAt:${ts('2026-10-10T10:00:00Z')}}},{id:'m2',d:{name:'<b>x</b>',email:'x@y.z',message:'تمت',status:'replied',createdAt:${ts('2026-10-09T10:00:00Z')}}}];
 export const getFirestore=()=>({}),collection=(db,n)=>({n}),doc=(db,c,i)=>({c,i}),query=(c)=>c,limit=()=>0,orderBy=()=>0,serverTimestamp=()=>'ST';
-const LISTS={storeProducts:[{id:'p1',d:{title:'قالب متجر',slug:'store-template',published:true}},{id:'p2',d:{title:'منتج مسودة',slug:'draft-prod',published:false}}],services:[{id:'s1',d:{title:'تطوير تطبيقات',slug:'apps-svc',published:true}}],articles:[{id:'a1',d:{title:'درس قديم',slug:'old-lesson',published:true,track:'websites',relatedProduct:'gone-prod',relatedService:'web-development'}}]};
+const LISTS={storeProducts:[{id:'p1',d:{title:'قالب متجر',slug:'store-template',published:true}},{id:'p2',d:{title:'منتج مسودة',slug:'draft-prod',published:false}}],services:[{id:'s1',d:{title:'تطوير تطبيقات',slug:'apps-svc',published:true}}],articles:[{id:'a1',d:{title:'درس قديم',slug:'old-lesson',published:true,track:'websites',relatedProduct:'gone-prod',relatedService:'web-development'}},{id:'e1',d:{title:'قديم',slug:'free-website-options',published:false,createdAt:'2026-01-01T00:00:00Z',imageUrl:'https://img.example/old.jpg',imagePath:'articles/e1/preview/old'}}]};
 export async function getDocs(c){const docs=c.n==='contactMessages'?MSGS.filter(m=>!globalThis.__deleted?.includes(m.id)).map(m=>({id:m.id,data:()=>m.d})):(LISTS[c.n]||[]).map(m=>({id:m.id,data:()=>m.d}));return {docs,empty:!docs.length,forEach:f=>docs.forEach(f)}}
 export async function getDoc(){return {data:()=>({}),exists:()=>true}}
 export async function updateDoc(r,d){__ops.push(['update',r.c,r.i,d.status]);const m=MSGS.find(x=>x.id===r.i);if(m)m.d.status=d.status}
 export async function deleteDoc(r){__ops.push(['delete',r.c,r.i]);(globalThis.__deleted||=[]).push(r.i)}
-export async function setDoc(r,d){__ops.push(['set',r.c,d.fileContentType,d.privateFilePath,d.productCategories?JSON.stringify(d.productCategories):undefined,d.track!==undefined?JSON.stringify({track:d.track,relatedProduct:d.relatedProduct,relatedService:d.relatedService}):undefined])} export async function addDoc(c,d){__ops.push(['add',c.n,d.action])}`,
+export async function setDoc(r,d){__ops.push(['set',r.c,d.fileContentType,d.privateFilePath,d.productCategories?JSON.stringify(d.productCategories):undefined,d.track!==undefined?JSON.stringify({track:d.track,relatedProduct:d.relatedProduct,relatedService:d.relatedService}):undefined,JSON.stringify(d),r.i])} export async function addDoc(c,d){__ops.push(['add',c.n,d.action])}`,
 };
 const b = await chromium.launch(); const p = await b.newPage({ viewport: { width: 1200, height: 900 } }); const errs = [];
 p.on('pageerror', e => errs.push(e.message)); p.on('dialog', d => d.accept());
 await p.route('https://www.gstatic.com/**', r => r.fulfill({ contentType: 'text/javascript', body: mods[r.request().url().split('/').pop()] }));
+const BUNDLE = JSON.parse(fs.readFileSync(new URL('../academy-import/bundle.json', import.meta.url), 'utf8')); let BUNDLE_SERVED = JSON.parse(JSON.stringify(BUNDLE)), BUNDLE_STATUS = 200; const IMG = Buffer.from('JPEGDATA');
+await p.route('**/academy-import/**', r => { const u = r.request().url(); if (u.endsWith('/bundle.json')) return BUNDLE_STATUS === 200 ? r.fulfill({ contentType: 'application/json', body: JSON.stringify(BUNDLE_SERVED) }) : r.fulfill({ status: BUNDLE_STATUS, body: 'x' }); if (u.includes('/covers/')) return r.fulfill({ contentType: 'image/jpeg', body: IMG }); return r.fulfill({ status: 404, body: '' }); });
 let fail = 0; const ok = (c, m) => { console.log((c ? '  ✔ ' : '  ✘ ') + m); if (!c) fail++; };
 await p.goto('http://localhost:4174/'); await p.waitForSelector('#messages .item');
 ok((await p.$$('#messages .item')).length === 2, 'two messages listed');
@@ -71,6 +73,35 @@ await (await (await p.$$('#items .item'))[0].$('button')).click(); await p.waitF
 ok(await p.inputValue('#track') === 'websites' && await p.inputValue('#relService') === 'web-development' && await p.inputValue('#relProduct') === 'gone-prod' && (await p.$eval('#relProduct', e => e.selectedOptions[0].textContent)).includes('غير موجود'), 'editing a lesson restores its fields (a deleted product stays selected, flagged)');
 await p.selectOption('#kind', 'storeProducts'); await p.waitForTimeout(200);
 ok(!(await p.isVisible('#track')) && !(await p.isVisible('#relProduct')), 'lesson fields hidden for other content types');
+console.log('Import panel');
+await p.waitForSelector('#import-list .item');
+{ const rows = await p.$$eval('#import-list .item', e => e.map(x => x.textContent));
+  ok(rows.length === 9, 'import panel lists the 9 bundle lessons');
+  ok(rows[1].includes('موجود كمسودة') && rows.filter(r => r.includes('جديد')).length === 8 && rows[1].includes('الصورة الحالية تبقى'), 'a lesson with an existing slug is flagged "will be updated" (its image stays); the rest are new'); }
+const waitDone = () => p.waitForFunction(() => /تم \d+ من 9/.test(document.getElementById('import-msg').textContent), null, { timeout: 8000 });
+await p.evaluate(() => { __ops.length = 0; document.getElementById('import-msg').textContent = ''; }); await p.click('#import-run'); await waitDone();
+{ const ops = await p.evaluate(() => __ops); const sets = ops.filter(o => o[0] === 'set' && o[1] === 'articles'); const docs = sets.map(o => ({ id: o[7], d: JSON.parse(o[6]) }));
+  ok(sets.length === 9 && docs.map(x => x.d.slug).join() === BUNDLE.lessons.map(l => l.slug).join(), 'nine lessons written, in bundle order');
+  ok(docs.every((x, i) => { const L = BUNDLE.lessons[i]; return x.d.title === L.title && x.d.description === L.description && x.d.content === L.content && x.d.track === L.track && x.d.relatedService === L.relatedService && x.d.relatedProduct === L.relatedProduct && x.d.seo.title === L.seo.title && x.d.seo.description === L.seo.description && x.d.seo.keywords === L.seo.keywords && x.d.published === true && x.d.seo.canonical === '' && x.d.seo.ogImage === ''; }), 'every field equals the bundle; published; canonical and OG image empty');
+  ok(docs[1].id === 'e1' && docs[1].d.createdAt === '2026-01-01T00:00:00Z' && docs[1].d.imageUrl === 'https://img.example/old.jpg' && new Set(docs.map(x => x.id)).size === 9, 'existing lesson updated in place (same id, creation date and image kept) — no duplicate');
+  ok(ops.filter(o => o[0] === 'add' && o[1] === 'adminActivityLogs').length === 9 && !ops.some(o => o[0] === 'upload') && (await p.textContent('#import-msg')).includes('تم 9 من 9'), 'activity logged for each lesson; no uploads when there are no images'); }
+// chosen images are matched by slug (case-insensitive extension); unmatched names are reported; draft mode
+await p.setInputFiles('#import-images', [{ name: 'create-and-sell-an-ebook.jpg', mimeType: 'image/jpeg', buffer: IMG }, { name: 'where-to-start-learning-programming.PNG', mimeType: 'image/png', buffer: IMG }, { name: 'random-file.jpg', mimeType: 'image/jpeg', buffer: IMG }]);
+{ const t = await p.textContent('#import-list'); ok(t.includes('random-file') && t.includes('ستُتجاهل') && t.includes('الصورة: من الملف الذي اخترته'), 'unmatched image names are reported and ignored'); }
+await p.check('#import-draft'); await p.evaluate(() => { __ops.length = 0; document.getElementById('import-msg').textContent = ''; }); await p.click('#import-run'); await waitDone();
+{ const ops = await p.evaluate(() => __ops), ups = ops.filter(o => o[0] === 'upload'), sets = ops.filter(o => o[0] === 'set' && o[1] === 'articles');
+  ok(ups.length === 2 && ups.map(u => u[2]).sort().join() === 'image/jpeg,image/png' && ups.every(u => /^articles\/[^/]+\/preview\/[^/]+$/.test(u[1])), 'two images uploaded to articles/<id>/preview/ with the right content types: ' + ups.map(u => u[1].split('/')[1].slice(0, 8)).join(','));
+  const bySlug = Object.fromEntries(sets.map(o => [JSON.parse(o[6]).slug, { id: o[7], d: JSON.parse(o[6]) }]));
+  ok(['create-and-sell-an-ebook', 'where-to-start-learning-programming'].every(k => bySlug[k].d.imagePath && bySlug[k].d.imagePath.split('/')[1] === bySlug[k].id) && !bySlug['design-an-online-store'].d.imagePath, 'image path stored only on the matched lessons, under their own id');
+  ok(sets.length === 9 && sets.every(o => JSON.parse(o[6]).published === false), 'draft mode saves all nine as unpublished'); }
+// cover shipped inside the bundle folder
+await p.setInputFiles('#import-images', []); await p.uncheck('#import-draft'); BUNDLE_SERVED.lessons[0].cover = 'covers/how-to-create-a-website-step-by-step.jpg'; await p.click('#import-reload'); await p.waitForFunction(() => document.getElementById('import-list').textContent.includes('من مجلد الحزمة'), null, { timeout: 5000 });
+await p.evaluate(() => { __ops.length = 0; document.getElementById('import-msg').textContent = ''; }); await p.click('#import-run'); await waitDone();
+{ const ups = (await p.evaluate(() => __ops)).filter(o => o[0] === 'upload'); ok(ups.length === 1 && ups[0][2] === 'image/jpeg', 'a cover found in the bundle folder is uploaded automatically'); }
+// broken / missing bundles
+BUNDLE_SERVED.lessons[2].track = 'no-such-track'; await p.click('#import-reload'); await p.waitForFunction(() => document.getElementById('import-msg').textContent.includes('غير صالح'), null, { timeout: 5000 });
+ok(await p.isDisabled('#import-run'), 'an invalid bundle is rejected and the import button is disabled');
+BUNDLE_STATUS = 404; await p.click('#import-reload'); await p.waitForTimeout(400); ok(!(await p.isVisible('#import-panel')), 'no bundle on the site (404) → the import panel hides itself');
 ok(errs.length === 0, 'no page errors ' + errs.join('|'));
 await p.screenshot({ path: OUT + '/admin.png', fullPage: false, clip: { x: 0, y: 0, width: 1200, height: 900 } });
 await p.evaluate(() => document.getElementById('messages').scrollIntoView()); await p.screenshot({ path: OUT + '/admin-msgs.png' });
