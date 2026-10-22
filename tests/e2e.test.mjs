@@ -56,7 +56,7 @@ async function newPage(opts = {}) {
       const flt = sq.where ? (sq.where.compositeFilter ? sq.where.compositeFilter.filters : [sq.where]) : [];
       let rows = (DATA[coll] || []).filter(([id, o]) => flt.every(f => { const ff = f.fieldFilter; const want = Object.values(ff.value)[0]; return String(o[ff.field.fieldPath]) === String(want); }));
       rows = rows.slice(0, sq.limit || 100);
-      return r.fulfill({ contentType: 'application/json', body: JSON.stringify(rows.length ? rows.map(([id, o]) => ({ document: fsDoc(coll, id, o) })) : [{ readTime: 'x' }]) });
+      return r.fulfill({ contentType: 'application/json', body: JSON.stringify(rows.length ? rows.map(([id, o]) => ({ document: fsDoc(coll, id, sq.select ? Object.fromEntries(Object.entries(o).filter(([k]) => sq.select.fields.some(f => f.fieldPath === k))) : o) })) : [{ readTime: 'x' }]) });
     }
     if (url.includes('/siteSettings/main')) return r.fulfill({ contentType: 'application/json', body: JSON.stringify({ fields: { social: { mapValue: { fields: { whatsapp: { stringValue: SETTINGS.social.whatsapp }, x: { stringValue: SETTINGS.social.x } } } }, heroButton: { stringValue: 'استكشف منتجاتنا' }, heroButtonUrl: { stringValue: '/products' }, productCategories: { mapValue: { fields: { templates: { mapValue: { fields: { title: { stringValue: 'قوالب جاهزة' }, description: { stringValue: 'وصف معدّل من اللوحة' } } } } } } } } }) });
     return r.fulfill({ status: 404, body: '{}' });
@@ -79,6 +79,7 @@ console.log('Home');
   ok(await p.getAttribute('#hero-button', 'href') === '/products' && (await p.textContent('#hero-button')) === 'استكشف منتجاتنا', 'hero button respects admin settings (/products)');
   ok(await p.$('#navlinks a[href="/products"]') && await p.$('#tabbar a[href="/products"]'), 'products link in top menu + bottom bar');
   await p.waitForSelector('#home-media .card'); ok(await p.$('#home-media a[href="/portfolio/client-store"]') && await p.getAttribute('#media-title + a.more', 'href') === '/portfolio', 'portfolio items shown in home works section');
+  ok(await p.$('#navlinks a[href="/learn"]'), 'academy link in top menu'); await p.waitForTimeout(300); ok(!(await p.$('#learn-title')), 'no academy section on home while there are no lessons');
   ok(p.__errors.length === 0, 'no console/CSP errors: ' + p.__errors.join(' | '));
   await p.screenshot({ path: OUT + '/home.png' }); }
 
@@ -162,8 +163,36 @@ console.log('Account');
 { const p = await newPage({ user: { uid: 'alice', email: 'alice@x.com' } }); await p.addInitScript(() => sessionStorage.setItem('kian_return', '/products/store-template')); await p.goto(B + '/#account');
   await p.waitForSelector('#auth-msg a'); ok(await p.getAttribute('#auth-msg a', 'href') === '/products/store-template', 'return-to-product link after login'); }
 
+console.log('Academy');
+DATA.articles.push(
+  ['l1', { title: 'دليل بناء موقعك الأول', slug: 'first-site-guide', description: 'درس في المواقع', track: 'websites', relatedProduct: 'store-template', relatedService: 'web-development', published: true, createdAt: new Date('2026-09-01T10:00:00Z'), content: '# مقدمة\nنص الدرس الأول' }],
+  ['l2', { title: 'أسرار صفحة المنتج', slug: 'product-page-guide', description: 'درس في المتاجر', track: 'stores', relatedService: 'web', published: true, createdAt: new Date('2026-09-02T10:00:00Z'), content: 'نص الدرس' }],
+  ['l3', { title: 'درس ثانٍ في المواقع', slug: 'second-site-guide', description: 'متابعة', track: 'websites', published: true, createdAt: new Date('2026-09-03T10:00:00Z'), content: 'نص' }],
+);
+{ const p = await newPage(); await p.goto(B + '/'); await p.waitForSelector('#home-learn .card');
+  ok((await p.$$('#home-learn .card')).length === 3 && await p.$('#learn-title + a.more[href="/learn"]'), 'home academy section lists the lessons');
+  await p.goto(B + '/learn'); await p.waitForSelector('.learn-track');
+  const heads = await p.$$eval('.learn-track h2', e => e.map(x => x.textContent)); ok(heads.join('|') === 'إنشاء المواقع|المتاجر الإلكترونية', 'academy shows only tracks that have lessons, in fixed order: ' + heads.join('|'));
+  const hrefs = await p.$$eval('.learn-track .card a.btn', e => e.map(x => x.getAttribute('href'))); ok(hrefs.join('|') === '/articles/first-site-guide|/articles/second-site-guide|/articles/product-page-guide', 'lessons ordered oldest first inside a track; plain articles excluded: ' + hrefs.join('|'));
+  ok((await p.title()).includes('الأكاديمية') && await p.getAttribute('meta[name=robots]', 'content') !== 'noindex,follow', 'academy page title + indexable');
+  await p.goto(B + '/learn/websites'); await p.waitForSelector('.grid .card'); ok((await p.$$('.grid .card')).length === 2 && (await p.textContent('h1')) === 'إنشاء المواقع', 'track page lists only its lessons');
+  ok((await p.textContent('.crumbs')).includes('الأكاديمية') && await p.$('.crumbs a[href="/learn"]') && await p.$('.learn-more a[href="/learn/stores"]'), 'track page: breadcrumbs + links to the other tracks');
+  for (const u of ['/learn/apps', '/learn/no-such-track']) { await p.goto(B + u); await p.waitForSelector('.notice'); ok((await p.textContent('h1')) === 'الصفحة غير موجودة' && await p.getAttribute('meta[name=robots]', 'content') === 'noindex,nofollow', u + ' → not found + noindex (empty or unknown track)'); }
+  ok(p.__errors.length === 0, 'no errors: ' + p.__errors.join(' | ')); }
+{ const p = await newPage(); await p.goto(B + '/articles/first-site-guide'); await p.waitForSelector('#next-step .card');
+  const cards = await p.$$eval('#next-step .card', e => e.map(x => ({ t: x.textContent, h: x.querySelector('a.btn').getAttribute('href') })));
+  ok(cards.length === 2 && cards[0].h === '/products/store-template' && cards[0].t.includes('USD 25') && cards[1].h === '/services/web-development' && cards[1].t.includes('تطوير المواقع'), 'lesson shows next step: linked product (with price) + static service: ' + JSON.stringify(cards.map(c => c.h)));
+  ok((await p.textContent('.crumbs')).replace(/\s+/g, ' ').includes('الأكاديمية / إنشاء المواقع / دليل بناء موقعك الأول') && await p.$('.crumbs a[href="/learn/websites"]'), 'lesson breadcrumbs go through the academy track');
+  const ld = JSON.parse(await p.textContent('#schema')); ok(ld.breadcrumb?.itemListElement?.length === 4 && ld.breadcrumb.itemListElement[2].item.endsWith('/learn/websites'), 'lesson BreadcrumbList includes academy + track');
+  await p.waitForSelector('#related .card'); ok((await p.textContent('#related h2')) === 'دروس ذات صلة' && (await p.textContent('#related .card h3')) === 'درس ثانٍ في المواقع', 'related lessons: same track first');
+  ok(p.__errors.length === 0, 'no errors: ' + p.__errors.join(' | ')); }
+{ const p = await newPage(); await p.goto(B + '/articles/product-page-guide'); await p.waitForSelector('#next-step .card');
+  ok((await p.$$('#next-step .card')).length === 1 && await p.$('#next-step a.btn[href="/services/web"]'), 'lesson linked to a database service'); }
+{ const p = await newPage(); await p.goto(B + '/articles/build-site'); await p.waitForSelector('#related .card'); await p.waitForTimeout(200);
+  ok(!(await p.$('#next-step')) && (await p.textContent('#related h2')) === 'مقالات ذات صلة' && !(await p.textContent('.crumbs')).includes('الأكاديمية'), 'plain article: no next-step box, no academy breadcrumbs'); }
+
 console.log('Layout overflow');
-for (const mobile of [false, true]) { const p = await newPage({ mobile }); for (const u of ['/', '/contact', '/articles/build-site', '/products/store-template', '/#account', '/about']) { await p.goto(B + u); await p.waitForTimeout(500); const [sw, cw] = await p.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth]); ok(sw <= cw, `no horizontal overflow ${mobile ? 'mobile' : 'desktop'} ${u} (${sw}/${cw})`); } }
+for (const mobile of [false, true]) { const p = await newPage({ mobile }); for (const u of ['/', '/contact', '/articles/build-site', '/products/store-template', '/#account', '/about', '/learn', '/articles/first-site-guide']) { await p.goto(B + u); await p.waitForTimeout(500); const [sw, cw] = await p.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth]); ok(sw <= cw, `no horizontal overflow ${mobile ? 'mobile' : 'desktop'} ${u} (${sw}/${cw})`); } }
 { const p = await newPage(); await p.goto(B + '/'); await p.waitForSelector('#social a'); ok((await p.$$eval('#social a', e => e.map(x => x.textContent))).join(',') === 'واتساب,إكس', 'Arabic social labels'); }
 console.log('Static pages');
 { const p = await newPage(); for (const u of ['/about', '/services', '/services/design', '/portfolio', '/no-such-page']) { await p.goto(B + u); await p.waitForTimeout(400); }
