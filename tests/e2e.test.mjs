@@ -260,6 +260,17 @@ for (const [w, h] of [[1350, 63], [1200, 63], [1024, 124], [412, 63]]) {
   await p.close();
 }
 
+console.log('Analytics');
+{ const p = await newPage(); await p.route('**/_vercel/insights/script.js', r => r.fulfill({ contentType: 'text/javascript', body: '' }));
+  await p.goto(B + '/about'); await p.waitForSelector('main#app h1');
+  ok(!(await p.$('script[src*="_vercel/insights"]')) && !(await p.evaluate(() => !!window.va)), 'not loaded on localhost');
+  await p.evaluate(() => { __kian.initAnalytics('kianalathad.com'); __kian.trackView(); });
+  const sc = await p.$eval('script[src="/_vercel/insights/script.js"]', e => ({ defer: e.defer, auto: e.dataset.disableAutoTrack }));
+  ok(sc.defer && sc.auto === '1', 'script injected deferred with auto-tracking disabled');
+  await p.evaluate(() => { globalThis.vaq.length = 0 }); await p.click('a[href="/contact"]'); await p.waitForSelector('#contact-form');
+  const q = await p.evaluate(() => [...(globalThis.vaq || [])].map(a => [...a])); ok(q.some(a => a[0] === 'pageview' && a[1].path === '/contact' && a[1].route === null), 'pageview sent on SPA navigation: ' + JSON.stringify(q));
+  ok(p.__errors.length === 0, 'no errors ' + p.__errors.join('|')); }
+
 console.log('Legal pages');
 for (const [u, h] of [['/privacy', 'سياسة الخصوصية'], ['/terms', 'الشروط والأحكام'], ['/refund', 'سياسة الاسترجاع']]) {
   const p = await newPage(); await p.goto(B + u); await p.waitForSelector('#legal-body.content-body h2', { timeout: 8000 });
