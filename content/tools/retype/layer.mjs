@@ -1,7 +1,9 @@
 import { chromium } from '../../../tests/node_modules/playwright/index.mjs';
 import fs from 'fs';
 const cfg = JSON.parse(fs.readFileSync(process.argv[2], 'utf8')), OUT = process.argv[3], ROOT = new URL('../../../', import.meta.url).pathname.replace(/\/$/, '');
-const font = w => ['arabic', 'latin'].map(s => `@font-face{font-family:"IBM Plex Sans Arabic";font-weight:${w};src:url(file://${ROOT}/fonts/plex-arabic-${s}-${w}.woff2) format("woff2");unicode-range:${s === 'arabic' ? 'U+0600-06FF,U+0750-077F,U+FB50-FDFF,U+FE70-FEFC,U+200C-200E' : 'U+0000-00FF,U+2000-206F'}}`).join('');
+// الخط يُضمَّن كـ data: URI لأن Chromium يمنع تحميل ملفات file:// من صفحة setContent فيسقط النص إلى خط النظام بصمت.
+const b64 = f => fs.readFileSync(f).toString('base64');
+const font = w => ['arabic', 'latin'].map(s => `@font-face{font-family:"IBM Plex Sans Arabic";font-weight:${w};src:url(data:font/woff2;base64,${b64(`${ROOT}/fonts/plex-arabic-${s}-${w}.woff2`)}) format("woff2");unicode-range:${s === 'arabic' ? 'U+0600-06FF,U+0750-077F,U+FB50-FDFF,U+FE70-FEFC,U+200C-200E' : 'U+0000-00FF,U+2000-206F'}}`).join('');
 const b = await chromium.launch(); const report = {};
 for (const c of cfg) {
   const pg = await b.newPage({ viewport: { width: c.W, height: c.H } });
@@ -11,6 +13,7 @@ for (const c of cfg) {
   #sub{position:absolute;right:${c.W - c.R}px;font-weight:400;color:#ddd6fe;text-align:right;white-space:nowrap}</style>
   <div id="badge">${c.badge}</div><div id="head">${c.head.join('<br>')}</div><div id="sub">${c.sub}</div>`;
   await pg.setContent(html); await pg.evaluate(() => document.fonts.ready); await pg.waitForTimeout(300);
+  if ((await pg.evaluate(() => [...document.fonts].filter(f => f.status === 'error').length)) > 0) throw new Error('الخط لم يُحمَّل: ستظهر الصورة بخط النظام');
   const res = await pg.evaluate(c => {
     const $ = id => document.getElementById(id), L = e => e.getBoundingClientRect();
     let hs = c.headFont, ss = c.subFont;
