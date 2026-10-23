@@ -19,7 +19,7 @@ TRACK={'websites':'إنشاء المواقع','stores':'المتاجر الإل�
 SVC={'web-development':'تطوير المواقع (صفحة ثابتة)','app-development':'تطوير التطبيقات (صفحة ثابتة)','design':'التصميم (صفحة ثابتة)','flutter-app-development':'تطوير تطبيقات Flutter'}
 PROD={'learn-engraving-ebook':'كتاب تعلّم النقش من الصفر: دليل تعليمي مصوّر خطوة بخطوة'}
 MAP={}
-for f in sorted(glob.glob(SRC+'0[1-9]-*.md')):
+for f in sorted(g for g in glob.glob(SRC+'[0-9][0-9]-*.md') if os.path.basename(g)[:2] not in ('00','10')):
     t=open(f,encoding='utf-8').read(); n=int(os.path.basename(f)[:2])
     tr=re.search(r'\(`([^`]+)`\) \|\n',cell(t,'مسار الأكاديمية')+' |\n').group(1)
     pr=re.search(r'`([^`]+)`',cell(t,'المنتج المرتبط') or ''); pr=pr.group(1) if pr else None
