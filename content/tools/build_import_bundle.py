@@ -18,7 +18,7 @@ def read(folder, prefix):
     return open(os.path.join(folder, name), encoding='utf-8').read().rstrip('\n')
 
 lessons = []
-for d in sorted(glob.glob(os.path.join(SRC, '0[1-9]-*'))):
+for d in sorted(x for x in glob.glob(os.path.join(SRC, '[0-9][0-9]-*')) if os.path.isdir(x) and os.path.basename(x)[:2] not in ('00', '10')):
     choices = read(d, '05')
     get = lambda label: re.search(label + r':\s+(.+)', choices).group(1).strip()
     track = TRACK[get('مسار الأكاديمية')]

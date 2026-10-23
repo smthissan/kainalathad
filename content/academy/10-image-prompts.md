@@ -310,3 +310,99 @@ Two generic smartphones side by side (one Android-style, one iPhone-style, no br
 ## 8) رفع الصورة
 
 من لوحة التحكم ← «إدارة المحتوى» ← **المقالات** ← افتح الدرس بزر «تعديل» ← اختر الصورة من حقل **الصورة** ← **حفظ**. تظهر الصورة تلقائياً في بطاقة الدرس وفي رأس صفحته وفي معاينة المشاركة.
+
+
+### الدرس 11: تحريك الصور بالذكاء الاصطناعي: من صورة ثابتة إلى فيديو قصير
+
+**ملف الصورة:** `animate-images-with-ai.jpg`  ·  **المقاس:** 1200×630
+
+**النصوص التي تُكتب على الصورة (حرفياً، بدون تغيير). العلامة `/` في صف التقسيم تعني نزول سطر جديد ولا تُكتب على الصورة:**
+
+| الطبقة | النص |
+|---|---|
+| الشارة | الذكاء الاصطناعي |
+| العنوان الرئيسي | تحريك الصور بالذكاء الاصطناعي |
+| تقسيم أسطر العنوان (للتوازن) | تحريك الصور / بالذكاء الاصطناعي |
+| العنوان الفرعي | من صورة ثابتة إلى فيديو |
+| توقيع العلامة | كيان للبرمجيات |
+| عنوان الموقع | kianalathad.com |
+
+**مشهد الصورة (يُلصق بعد البرومبت الأساسي):**
+
+```
+A framed still picture on the left turning into a sequence of three film frames moving to the right with small gold motion arrows, ending in a rounded play button. Soft sparkles around. The picture inside the frame shows only simple abstract shapes: a sun circle and two hills. No text, no letters.
+```
+
+**النص البديل (Alt) للصورة:** تحويل صورة ثابتة إلى فيديو بالذكاء الاصطناعي
+
+
+### الدرس 12: السيو للمبتدئين: كيف يظهر موقعك في نتائج البحث
+
+**ملف الصورة:** `seo-for-beginners.jpg`  ·  **المقاس:** 1200×630
+
+**النصوص التي تُكتب على الصورة (حرفياً، بدون تغيير). العلامة `/` في صف التقسيم تعني نزول سطر جديد ولا تُكتب على الصورة:**
+
+| الطبقة | النص |
+|---|---|
+| الشارة | إنشاء المواقع |
+| العنوان الرئيسي | السيو للمبتدئين |
+| تقسيم أسطر العنوان (للتوازن) | السيو للمبتدئين (سطر واحد) |
+| العنوان الفرعي | كيف يظهر موقعك في البحث |
+| توقيع العلامة | كيان للبرمجيات |
+| عنوان الموقع | kianalathad.com |
+
+**مشهد الصورة (يُلصق بعد البرومبت الأساسي):**
+
+```
+A simplified browser window with a rounded search bar, a list of result cards drawn as colored bars where the top card is highlighted with a gold star, a large magnifying glass in front, and a rising bar chart with an upward gold arrow. No text, no letters.
+```
+
+**النص البديل (Alt) للصورة:** السيو للمبتدئين: ظهور الموقع في نتائج البحث
+
+
+### الدرس 13: الدومين والاستضافة: ما الفرق وكيف تختارهما
+
+**ملف الصورة:** `domain-and-hosting-guide.jpg`  ·  **المقاس:** 1200×630
+
+**النصوص التي تُكتب على الصورة (حرفياً، بدون تغيير). العلامة `/` في صف التقسيم تعني نزول سطر جديد ولا تُكتب على الصورة:**
+
+| الطبقة | النص |
+|---|---|
+| الشارة | إنشاء المواقع |
+| العنوان الرئيسي | الدومين والاستضافة |
+| تقسيم أسطر العنوان (للتوازن) | الدومين / والاستضافة |
+| العنوان الفرعي | الفرق وكيف تختار |
+| توقيع العلامة | كيان للبرمجيات |
+| عنوان الموقع | kianalathad.com |
+
+**مشهد الصورة (يُلصق بعد البرومبت الأساسي):**
+
+```
+A small house with a gold address sign board hanging at its door (the sign shows only an abstract link icon), standing on a server block made of three stacked rounded rectangles with small status lights, connected by a dotted line to a globe. No text, no letters.
+```
+
+**النص البديل (Alt) للصورة:** الفرق بين الدومين والاستضافة
+
+
+### الدرس 14: HTML وCSS للمبتدئين: ابنِ أول صفحة ويب بنفسك
+
+**ملف الصورة:** `html-css-first-page.jpg`  ·  **المقاس:** 1200×630
+
+**النصوص التي تُكتب على الصورة (حرفياً، بدون تغيير). العلامة `/` في صف التقسيم تعني نزول سطر جديد ولا تُكتب على الصورة:**
+
+| الطبقة | النص |
+|---|---|
+| الشارة | تعلم البرمجة |
+| العنوان الرئيسي | أول صفحة ويب لك |
+| تقسيم أسطر العنوان (للتوازن) | أول صفحة / ويب لك |
+| العنوان الفرعي | تعلم HTML وCSS خطوة بخطوة |
+| توقيع العلامة | كيان للبرمجيات |
+| عنوان الموقع | kianalathad.com |
+
+**مشهد الصورة (يُلصق بعد البرومبت الأساسي):**
+
+```
+A code editor window with colored horizontal bars for code lines and angle-bracket symbols, and next to it a browser window showing the resulting simple page made of a title bar block, a card and a list. A gold arrow links the code to the page. Do not show readable code.
+```
+
+**النص البديل (Alt) للصورة:** بناء أول صفحة ويب بـ HTML وCSS

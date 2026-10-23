@@ -105,15 +105,15 @@ ok(!(await p.isVisible('#track')) && !(await p.isVisible('#relProduct')), 'lesso
 console.log('Import panel');
 await p.waitForSelector('#import-list .item');
 { const rows = await p.$$eval('#import-list .item', e => e.map(x => x.textContent));
-  ok(rows.length === 9, 'import panel lists the 9 bundle lessons');
-  ok(rows[1].includes('موجود كمسودة') && rows.filter(r => r.includes('جديد')).length === 8 && rows[1].includes('الصورة الحالية تبقى'), 'a lesson with an existing slug is flagged "will be updated" (its image stays); the rest are new'); }
-const waitDone = () => p.waitForFunction(() => /تم \d+ من 9/.test(document.getElementById('import-msg').textContent), null, { timeout: 8000 });
+  ok(rows.length === BUNDLE.lessons.length, 'import panel lists all ' + BUNDLE.lessons.length + ' bundle lessons');
+  ok(rows[1].includes('موجود كمسودة') && rows.filter(r => r.includes('جديد')).length === BUNDLE.lessons.length - 1 && rows[1].includes('الصورة الحالية تبقى'), 'a lesson with an existing slug is flagged "will be updated" (its image stays); the rest are new'); }
+const waitDone = () => p.waitForFunction((n) => new RegExp('تم \\d+ من ' + n).test(document.getElementById('import-msg').textContent), BUNDLE.lessons.length, { timeout: 8000 });
 await p.evaluate(() => { __ops.length = 0; document.getElementById('import-msg').textContent = ''; }); await p.click('#import-run'); await waitDone();
 { const ops = await p.evaluate(() => __ops); const sets = ops.filter(o => o[0] === 'set' && o[1] === 'articles'); const docs = sets.map(o => ({ id: o[7], d: JSON.parse(o[6]) }));
-  ok(sets.length === 9 && docs.map(x => x.d.slug).join() === BUNDLE.lessons.map(l => l.slug).join(), 'nine lessons written, in bundle order');
+  ok(sets.length === BUNDLE.lessons.length && docs.map(x => x.d.slug).join() === BUNDLE.lessons.map(l => l.slug).join(), 'every bundle lesson written, in bundle order');
   ok(docs.every((x, i) => { const L = BUNDLE.lessons[i]; return x.d.title === L.title && x.d.description === L.description && x.d.content === L.content && x.d.track === L.track && x.d.relatedService === L.relatedService && x.d.relatedProduct === L.relatedProduct && x.d.seo.title === L.seo.title && x.d.seo.description === L.seo.description && x.d.seo.keywords === L.seo.keywords && x.d.published === true && x.d.seo.canonical === '' && x.d.seo.ogImage === ''; }), 'every field equals the bundle; published; canonical and OG image empty');
-  ok(docs[1].id === 'e1' && docs[1].d.createdAt === '2026-01-01T00:00:00Z' && docs[1].d.imageUrl === 'https://img.example/old.jpg' && new Set(docs.map(x => x.id)).size === 9, 'existing lesson updated in place (same id, creation date and image kept) — no duplicate');
-  ok(ops.filter(o => o[0] === 'add' && o[1] === 'adminActivityLogs').length === 9 && !ops.some(o => o[0] === 'upload') && (await p.textContent('#import-msg')).includes('تم 9 من 9'), 'activity logged for each lesson; no uploads when there are no images'); }
+  ok(docs[1].id === 'e1' && docs[1].d.createdAt === '2026-01-01T00:00:00Z' && docs[1].d.imageUrl === 'https://img.example/old.jpg' && new Set(docs.map(x => x.id)).size === BUNDLE.lessons.length, 'existing lesson updated in place (same id, creation date and image kept) — no duplicate');
+  ok(ops.filter(o => o[0] === 'add' && o[1] === 'adminActivityLogs').length === BUNDLE.lessons.length && !ops.some(o => o[0] === 'upload') && (await p.textContent('#import-msg')).includes(`تم ${BUNDLE.lessons.length} من ${BUNDLE.lessons.length}`), 'activity logged for each lesson; no uploads when there are no images'); }
 // chosen images are matched by slug (case-insensitive extension); unmatched names are reported; draft mode
 await p.setInputFiles('#import-images', [{ name: 'create-and-sell-an-ebook.jpg', mimeType: 'image/jpeg', buffer: IMG }, { name: 'where-to-start-learning-programming.PNG', mimeType: 'image/png', buffer: IMG }, { name: 'random-file.jpg', mimeType: 'image/jpeg', buffer: IMG }]);
 { const t = await p.textContent('#import-list'); ok(t.includes('random-file') && t.includes('ستُتجاهل') && t.includes('الصورة: من الملف الذي اخترته'), 'unmatched image names are reported and ignored'); }
@@ -122,7 +122,7 @@ await p.check('#import-draft'); await p.evaluate(() => { __ops.length = 0; docum
   ok(ups.length === 2 && ups.map(u => u[2]).sort().join() === 'image/jpeg,image/png' && ups.every(u => /^articles\/[^/]+\/preview\/[^/]+$/.test(u[1])), 'two images uploaded to articles/<id>/preview/ with the right content types: ' + ups.map(u => u[1].split('/')[1].slice(0, 8)).join(','));
   const bySlug = Object.fromEntries(sets.map(o => [JSON.parse(o[6]).slug, { id: o[7], d: JSON.parse(o[6]) }]));
   ok(['create-and-sell-an-ebook', 'where-to-start-learning-programming'].every(k => bySlug[k].d.imagePath && bySlug[k].d.imagePath.split('/')[1] === bySlug[k].id) && !bySlug['design-an-online-store'].d.imagePath, 'image path stored only on the matched lessons, under their own id');
-  ok(sets.length === 9 && sets.every(o => JSON.parse(o[6]).published === false), 'draft mode saves all nine as unpublished'); }
+  ok(sets.length === BUNDLE.lessons.length && sets.every(o => JSON.parse(o[6]).published === false), 'draft mode saves all lessons as unpublished'); }
 // cover shipped inside the bundle folder
 await p.setInputFiles('#import-images', []); await p.uncheck('#import-draft'); BUNDLE_SERVED.lessons[0].cover = 'covers/how-to-create-a-website-step-by-step.jpg'; await p.click('#import-reload'); await p.waitForFunction(() => document.getElementById('import-list').textContent.includes('من مجلد الحزمة'), null, { timeout: 5000 });
 await p.evaluate(() => { __ops.length = 0; document.getElementById('import-msg').textContent = ''; }); await p.click('#import-run'); await waitDone();
@@ -131,14 +131,14 @@ await p.evaluate(() => { __ops.length = 0; document.getElementById('import-msg')
 await p.setInputFiles('#import-images', []); await p.uncheck('#import-draft');
 { const S = BUNDLE_SERVED.lessons.map(l => l.slug); BUNDLE_SERVED.lessons[2].track = BUNDLE.lessons[2].track; BUNDLE_STATUS = 200; await p.click('#import-reload'); await p.waitForFunction(() => !document.getElementById('import-run').disabled, null, { timeout: 5000 });
   await p.evaluate(([f, h]) => { globalThis.__failSlug = f; globalThis.__hangSlug = h; globalThis.__importTimeout = 400; __ops.length = 0; document.getElementById('import-msg').textContent = ''; }, [S[2], S[3]]);
-  await p.click('#import-run'); await p.waitForFunction(() => /تم \d+ من 9/.test(document.getElementById('import-msg').textContent), null, { timeout: 8000 });
+  await p.click('#import-run'); await p.waitForFunction((n) => new RegExp('تم \\d+ من ' + n).test(document.getElementById('import-msg').textContent), BUNDLE.lessons.length, { timeout: 8000 });
   const log = await p.textContent('#import-msg'); const sets = (await p.evaluate(() => __ops)).filter(o => o[0] === 'set' && o[1] === 'articles');
-  ok(log.includes('تم 7 من 9') && sets.length === 7, 'two lessons fail, the other seven are still saved (the loop does not stop): ' + log.split('\n').filter(l => l.startsWith('✘')).length + ' failed');
+  ok(log.includes(`تم ${BUNDLE.lessons.length - 2} من ${BUNDLE.lessons.length}`) && sets.length === BUNDLE.lessons.length - 2, 'two lessons fail, the other seven are still saved (the loop does not stop): ' + log.split('\n').filter(l => l.startsWith('✘')).length + ' failed');
   ok(log.includes('✘') && log.includes('permission-denied') && log.includes('Missing or insufficient permissions'), 'a failure shows the lesson title, the error code and the message');
   ok(log.includes('انتهت المهلة أثناء حفظ الدرس'), 'a write that never finishes times out with a clear message instead of hanging');
   ok(await p.isVisible('#import-copy'), 'a copy-log button is available so the log can be sent for diagnosis');
-  await p.evaluate(() => { delete globalThis.__failSlug; delete globalThis.__hangSlug; __ops.length = 0; document.getElementById('import-msg').textContent = ''; }); await p.click('#import-run'); await p.waitForFunction(() => /تم \d+ من 9/.test(document.getElementById('import-msg').textContent), null, { timeout: 8000 });
-  ok((await p.textContent('#import-msg')).includes('تم 9 من 9'), 'retrying after the problem is fixed completes all nine'); }
+  await p.evaluate(() => { delete globalThis.__failSlug; delete globalThis.__hangSlug; __ops.length = 0; document.getElementById('import-msg').textContent = ''; }); await p.click('#import-run'); await p.waitForFunction((n) => new RegExp('تم \\d+ من ' + n).test(document.getElementById('import-msg').textContent), BUNDLE.lessons.length, { timeout: 8000 });
+  ok((await p.textContent('#import-msg')).includes(`تم ${BUNDLE.lessons.length} من ${BUNDLE.lessons.length}`), 'retrying after the problem is fixed completes all nine'); }
 // broken / missing bundles
 BUNDLE_SERVED.lessons[2].track = 'no-such-track'; await p.click('#import-reload'); await p.waitForFunction(() => document.getElementById('import-msg').textContent.includes('غير صالح'), null, { timeout: 5000 });
 ok(await p.isDisabled('#import-run'), 'an invalid bundle is rejected and the import button is disabled');
