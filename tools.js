@@ -10,7 +10,7 @@ export const TOOLS = {
 };
 
 export function toolsIndex() {
-  return `<div class="grid">${Object.entries(TOOLS).map(([href, [t, d]]) => `<article class="card"><h3>${esc(t)}</h3><p>${esc(d)}</p><a class="btn" href="${href}">استخدم الأداة</a></article>`).join('')}</div><p class="notice" style="margin-top:16px">كل الأدوات مجانية وتعمل داخل متصفحك فقط، فلا نرى ما تكتبه فيها.</p>`;
+  return `<div class="grid">${Object.entries(TOOLS).map(([href, [t, d]]) => `<article class="card"><h2>${esc(t)}</h2><p>${esc(d)}</p><a class="btn" href="${href}">استخدم الأداة</a></article>`).join('')}</div><p class="notice" style="margin-top:16px">كل الأدوات مجانية وتعمل داخل متصفحك فقط، فلا نرى ما تكتبه فيها.</p>`;
 }
 
 export async function mount(root, path) {

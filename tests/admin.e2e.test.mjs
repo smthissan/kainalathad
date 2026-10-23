@@ -34,6 +34,18 @@ ok(JSON.stringify(await p.evaluate(() => __ops)).includes('["update","contactMes
 ok((await p.textContent('#messages-count')) === '', 'counter cleared after read');
 await (await (await p.$$('#messages .item'))[1].$('button.danger')).click(); await p.waitForTimeout(300);
 ok((await p.$$('#messages .item')).length === 1, 'delete works');
+console.log('Image optimisation');
+async function saveWithImage(buffer, mimeType, name) {
+  await p.evaluate(() => { __ops.length = 0; }); await p.click('#new'); await p.selectOption('#kind', 'services'); await p.fill('#title', 'خدمة بصورة');
+  await p.setInputFiles('#image', { name, mimeType, buffer }); await p.click('#save'); await p.waitForTimeout(500);
+  return (await p.evaluate(() => __ops)).find(o => o[0] === 'upload' && o[1].includes('/preview/'));
+}
+const bigPng = Buffer.from(await p.evaluate(async () => { const c = document.createElement('canvas'); c.width = 2000; c.height = 1300; const x = c.getContext('2d'), d = x.createImageData(2000, 1300); for (let i = 0; i < d.data.length; i += 4) { d.data[i] = Math.random() * 30; d.data[i + 1] = Math.random() * 30; d.data[i + 2] = Math.random() * 30; d.data[i + 3] = 255 } x.putImageData(d, 0, 0); const b = await new Promise(r => c.toBlob(r, 'image/png')); return await new Promise(r => { const f = new FileReader(); f.onload = () => r(f.result.split(',')[1]); f.readAsDataURL(b) }) }), 'base64');
+const smallPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
+{ const up = await saveWithImage(bigPng, 'image/png', 'huge.png'); ok(bigPng.length > 1e6 && up && up[2] === 'image/webp', 'large PNG (' + Math.round(bigPng.length / 1024) + 'KB) is converted to WebP before upload: ' + JSON.stringify(up)); }
+{ const up = await saveWithImage(smallPng, 'image/png', 'tiny.png'); ok(up && up[2] === 'image/png', 'small image uploaded unchanged: ' + JSON.stringify(up)); }
+{ const up = await saveWithImage(Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>'), 'image/svg+xml', 'a.svg'); ok(up && up[2] === 'image/svg+xml', 'SVG uploaded unchanged'); }
+
 console.log('Service packages');
 await p.selectOption('#pkg-service', 'design'); await p.fill('#pkg-text', 'بدون عنوان'); await p.click('#pkg-save'); await p.waitForTimeout(150);
 ok((await p.textContent('#pkg-msg')).includes('ابدأ كل باقة') && !JSON.stringify(await p.evaluate(() => __ops)).includes('"pkg"'), 'rejects text without a # package heading');

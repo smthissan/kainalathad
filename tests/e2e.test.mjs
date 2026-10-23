@@ -251,6 +251,15 @@ console.log('Packages');
   await p.click('.pkg a.btn'); await p.waitForSelector('#contact-form'); ok((await p.inputValue('#c-subject')) === 'طلب باقة: الأساسية', 'contact subject prefilled');
   await p.goto(B + '/services/web-development'); await p.waitForSelector('.actions'); ok(!(await p.$('.packages')), 'no packages section when none configured');
   ok(p.__errors.length === 0, 'no errors ' + p.__errors.join('|')); }
+console.log('Header stability');
+for (const [w, h] of [[1350, 63], [1200, 63], [1024, 124], [412, 63]]) {
+  const p = await newPage(); await p.setViewportSize({ width: w, height: 800 }); await p.goto(B + '/learn'); await p.waitForSelector('header');
+  const h0 = await p.$eval('header', e => Math.round(e.getBoundingClientRect().height)); await p.waitForTimeout(600);
+  const h1 = await p.$eval('header', e => Math.round(e.getBoundingClientRect().height));
+  ok(h0 === h && h1 === h, `header height is ${h}px at ${w}px, before and after settings load (${h0} → ${h1})`);
+  await p.close();
+}
+
 console.log('Legal pages');
 for (const [u, h] of [['/privacy', 'سياسة الخصوصية'], ['/terms', 'الشروط والأحكام'], ['/refund', 'سياسة الاسترجاع']]) {
   const p = await newPage(); await p.goto(B + u); await p.waitForSelector('#legal-body.content-body h2', { timeout: 8000 });
