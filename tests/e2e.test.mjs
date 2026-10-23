@@ -271,6 +271,13 @@ console.log('Analytics');
   const q = await p.evaluate(() => [...(globalThis.vaq || [])].map(a => [...a])); ok(q.some(a => a[0] === 'pageview' && a[1].path === '/contact' && a[1].route === null), 'pageview sent on SPA navigation: ' + JSON.stringify(q));
   ok(p.__errors.length === 0, 'no errors ' + p.__errors.join('|')); }
 
+console.log('SEO basics');
+{ const p = await newPage(); await p.goto(B + '/services'); await p.waitForSelector('.learn-more a');
+  ok((await p.$$eval('.learn-more a', e => e.map(x => x.getAttribute('href')))).join() === '/services/web-development,/services/app-development,/services/software-development,/services/design', '/services links the four static service pages (no orphan)');
+  for (const u of ['/services', '/products', '/articles', '/media', '/portfolio', '/about', '/contact', '/terms', '/refund', '/services/design', '/products/ebooks']) {
+    await p.goto(B + u); await p.waitForTimeout(250); const d = await p.$eval('meta[name=description]', e => e.content);
+    ok(d.length >= 70 && d.length <= 170, `${u}: meta description ${d.length} chars`); } }
+
 console.log('Legal pages');
 for (const [u, h] of [['/privacy', 'سياسة الخصوصية'], ['/terms', 'الشروط والأحكام'], ['/refund', 'سياسة الاسترجاع']]) {
   const p = await newPage(); await p.goto(B + u); await p.waitForSelector('#legal-body.content-body h2', { timeout: 8000 });
