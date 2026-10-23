@@ -72,8 +72,8 @@ export async function GET(request) {
   // التخزين المؤقت في شبكة Vercel: النتيجة الناجحة 10 دقائق، و"غير موجود" دقيقة، والفشل لا يُخزَّن
   const CACHE_OK = 'public, max-age=0, s-maxage=600, stale-while-revalidate=86400';
   const CACHE_MISS = 'public, max-age=0, s-maxage=60';
-  const html = (body, cache) =>
-    new Response(body, { status: 200, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': cache } });
+  const html = (body, cache, status = 200) =>
+    new Response(body, { status, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': cache } });
 
   let original;
   try {
@@ -89,7 +89,8 @@ export async function GET(request) {
   }
   const doc = await docP;
   if (doc === undefined) return html(original, 'no-store');
-  if (!doc) return html(original, CACHE_MISS);
+  // slug غير موجود أو غير منشور: 404 حقيقي للروبوتات كي لا تُعدّ الصفحة soft-404 (الواجهة تضع noindex للزوار)
+  if (!doc) return html(original, CACHE_MISS, 404);
 
   try {
     const seo = doc.seo && typeof doc.seo === 'object' ? doc.seo : {};
@@ -112,6 +113,7 @@ export async function GET(request) {
       `<link rel="canonical" href="${esc(canonical)}">` +
       `<meta property="og:type" content="${coll === 'articles' ? 'article' : coll === 'products' ? 'product' : 'website'}">` +
       `<meta property="og:site_name" content="${esc(SITE)}">` +
+      `<meta property="og:locale" content="ar_AR">` +
       `<meta property="og:title" content="${esc(ogTitle)}">` +
       `<meta property="og:description" content="${esc(ogDesc)}">` +
       `<meta property="og:url" content="${esc(canonical)}">` +
