@@ -89,6 +89,27 @@ test('purchaseRequests: read/update scope', async () => {
   await assertSucceeds(updateDoc(doc(admin().firestore(), 'purchaseRequests/alice1'), { status: 'completed', updatedAt: serverTimestamp() }));
   await assertSucceeds(getDocs(collection(admin().firestore(), 'purchaseRequests')));
 });
+test('subscribers', async () => {
+  const db = anon().firestore();
+  const sub = (o = {}) => ({ email: 'a@b.co', source: 'article', consent: true, status: 'active', createdAt: serverTimestamp(), ...o });
+  await assertSucceeds(setDoc(doc(db, 'subscribers/a@b.co'), sub()));
+  await assertFails(setDoc(doc(db, 'subscribers/a@b.co'), sub()));                                  // مشترك موجود: لا تعديل
+  await assertFails(setDoc(doc(db, 'subscribers/other@b.co'), sub()));                              // المعرّف يطابق البريد فقط
+  await assertFails(setDoc(doc(db, 'subscribers/Upper@b.co'), sub({ email: 'Upper@b.co' })));       // حروف كبيرة مرفوضة
+  await assertSucceeds(setDoc(doc(db, 'subscribers/up@b.co'), sub({ email: 'up@b.co' })));
+  await assertFails(setDoc(doc(db, 'subscribers/c@d.co'), sub({ email: 'c@d.co', consent: false })));
+  await assertFails(setDoc(doc(db, 'subscribers/c@d.co'), sub({ email: 'c@d.co', status: 'unsubscribed' })));
+  await assertFails(setDoc(doc(db, 'subscribers/c@d.co'), sub({ email: 'c@d.co', extra: 1 })));
+  await assertFails(setDoc(doc(db, 'subscribers/c@d.co'), sub({ email: 'c@d.co', createdAt: new Date() })));
+  await assertFails(setDoc(doc(db, 'subscribers/bad'), sub({ email: 'bad' })));
+  await assertFails(getDoc(doc(db, 'subscribers/a@b.co')));                                         // الزائر لا يقرأ القائمة
+  await assertFails(getDocs(collection(db, 'subscribers')));
+  await assertFails(getDocs(collection(alice().firestore(), 'subscribers')));
+  await assertFails(getDocs(collection(fakeAdmin().firestore(), 'subscribers')));
+  await assertSucceeds(getDocs(collection(admin().firestore(), 'subscribers')));
+  await assertSucceeds(updateDoc(doc(admin().firestore(), 'subscribers/a@b.co'), { status: 'unsubscribed' }));
+  await assertSucceeds(deleteDoc(doc(admin().firestore(), 'subscribers/a@b.co')));
+});
 test('contactMessages', async () => {
   const db = anon().firestore();
   await assertSucceeds(addDoc(collection(db, 'contactMessages'), msg()));

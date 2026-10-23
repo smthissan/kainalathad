@@ -9,12 +9,12 @@ const mods = {
   'firebase-auth.js': `export const getAuth=()=>({});export const signInWithEmailAndPassword=async()=>{},signOut=async()=>{};export function onAuthStateChanged(a,cb){setTimeout(()=>cb({uid:'adm',email:'smthysan@gmail.com'}),0)}`,
   'firebase-firestore.js': `globalThis.__ops=[];const MSGS=[{id:'m1',d:{name:'أحمد',email:'a@b.co',phone:'+9677',subject:'موقع',message:'أريد موقعاً\\nسطر 2',status:'new',createdAt:${ts('2026-10-10T10:00:00Z')}}},{id:'m2',d:{name:'<b>x</b>',email:'x@y.z',message:'تمت',status:'replied',createdAt:${ts('2026-10-09T10:00:00Z')}}}];
 export const getFirestore=()=>({}),collection=(db,n)=>({n}),doc=(db,c,i)=>({c,i}),query=(c)=>c,limit=()=>0,orderBy=()=>0,serverTimestamp=()=>'ST';
-const LISTS={storeProducts:[{id:'p1',d:{title:'قالب متجر',slug:'store-template',published:true}},{id:'p2',d:{title:'منتج مسودة',slug:'draft-prod',published:false}}],services:[{id:'s1',d:{title:'تطوير تطبيقات',slug:'apps-svc',published:true}}],articles:[{id:'a1',d:{title:'درس قديم',slug:'old-lesson',published:true,track:'websites',relatedProduct:'gone-prod',relatedService:'web-development'}},{id:'e1',d:{title:'قديم',slug:'free-website-options',published:false,createdAt:'2026-01-01T00:00:00Z',imageUrl:'https://img.example/old.jpg',imagePath:'articles/e1/preview/old'}}]};
+const LISTS={subscribers:[{id:'s1@x.co',d:{email:'s1@x.co',source:'article',status:'active',createdAt:${ts('2026-10-11T10:00:00Z')}}},{id:'=cmd@x.co',d:{email:'=cmd@x.co',source:'tool',status:'active',createdAt:${ts('2026-10-12T10:00:00Z')}}},{id:'old@x.co',d:{email:'old@x.co',source:'learn',status:'unsubscribed',createdAt:${ts('2026-10-01T10:00:00Z')}}}],storeProducts:[{id:'p1',d:{title:'قالب متجر',slug:'store-template',published:true}},{id:'p2',d:{title:'منتج مسودة',slug:'draft-prod',published:false}}],services:[{id:'s1',d:{title:'تطوير تطبيقات',slug:'apps-svc',published:true}}],articles:[{id:'a1',d:{title:'درس قديم',slug:'old-lesson',published:true,track:'websites',relatedProduct:'gone-prod',relatedService:'web-development'}},{id:'e1',d:{title:'قديم',slug:'free-website-options',published:false,createdAt:'2026-01-01T00:00:00Z',imageUrl:'https://img.example/old.jpg',imagePath:'articles/e1/preview/old'}}]};
 export async function getDocs(c){const docs=c.n==='contactMessages'?MSGS.filter(m=>!globalThis.__deleted?.includes(m.id)).map(m=>({id:m.id,data:()=>m.d})):(LISTS[c.n]||[]).map(m=>({id:m.id,data:()=>m.d}));return {docs,empty:!docs.length,forEach:f=>docs.forEach(f)}}
 export async function getDoc(){return {data:()=>({}),exists:()=>true}}
 export async function updateDoc(r,d){__ops.push(['update',r.c,r.i,d.status]);const m=MSGS.find(x=>x.id===r.i);if(m)m.d.status=d.status}
 export async function deleteDoc(r){__ops.push(['delete',r.c,r.i]);(globalThis.__deleted||=[]).push(r.i)}
-export async function setDoc(r,d){if(globalThis.__failSlug&&d.slug===globalThis.__failSlug){const e=new Error('Missing or insufficient permissions.');e.code='permission-denied';throw e}if(globalThis.__hangSlug&&d.slug===globalThis.__hangSlug)return new Promise(()=>{});__ops.push(['set',r.c,d.fileContentType,d.privateFilePath,d.productCategories?JSON.stringify(d.productCategories):undefined,d.track!==undefined?JSON.stringify({track:d.track,relatedProduct:d.relatedProduct,relatedService:d.relatedService}):undefined,JSON.stringify(d),r.i])} export async function addDoc(c,d){__ops.push(['add',c.n,d.action])}`,
+export async function setDoc(r,d){if(globalThis.__failSlug&&d.slug===globalThis.__failSlug){const e=new Error('Missing or insufficient permissions.');e.code='permission-denied';throw e}if(d.servicePackages)__ops.push(['pkg',JSON.stringify(d.servicePackages)]);if(globalThis.__hangSlug&&d.slug===globalThis.__hangSlug)return new Promise(()=>{});__ops.push(['set',r.c,d.fileContentType,d.privateFilePath,d.productCategories?JSON.stringify(d.productCategories):undefined,d.track!==undefined?JSON.stringify({track:d.track,relatedProduct:d.relatedProduct,relatedService:d.relatedService}):undefined,JSON.stringify(d),r.i])} export async function addDoc(c,d){__ops.push(['add',c.n,d.action])}`,
 };
 const b = await chromium.launch(); const p = await b.newPage({ viewport: { width: 1200, height: 900 } }); const errs = [];
 p.on('pageerror', e => errs.push(e.message)); p.on('dialog', d => d.accept());
@@ -34,6 +34,30 @@ ok(JSON.stringify(await p.evaluate(() => __ops)).includes('["update","contactMes
 ok((await p.textContent('#messages-count')) === '', 'counter cleared after read');
 await (await (await p.$$('#messages .item'))[1].$('button.danger')).click(); await p.waitForTimeout(300);
 ok((await p.$$('#messages .item')).length === 1, 'delete works');
+console.log('Image optimisation');
+async function saveWithImage(buffer, mimeType, name) {
+  await p.evaluate(() => { __ops.length = 0; }); await p.click('#new'); await p.selectOption('#kind', 'services'); await p.fill('#title', 'خدمة بصورة');
+  await p.setInputFiles('#image', { name, mimeType, buffer }); await p.click('#save'); await p.waitForTimeout(500);
+  return (await p.evaluate(() => __ops)).find(o => o[0] === 'upload' && o[1].includes('/preview/'));
+}
+const bigPng = Buffer.from(await p.evaluate(async () => { const c = document.createElement('canvas'); c.width = 2000; c.height = 1300; const x = c.getContext('2d'), d = x.createImageData(2000, 1300); for (let i = 0; i < d.data.length; i += 4) { d.data[i] = Math.random() * 30; d.data[i + 1] = Math.random() * 30; d.data[i + 2] = Math.random() * 30; d.data[i + 3] = 255 } x.putImageData(d, 0, 0); const b = await new Promise(r => c.toBlob(r, 'image/png')); return await new Promise(r => { const f = new FileReader(); f.onload = () => r(f.result.split(',')[1]); f.readAsDataURL(b) }) }), 'base64');
+const smallPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
+{ const up = await saveWithImage(bigPng, 'image/png', 'huge.png'); ok(bigPng.length > 1e6 && up && up[2] === 'image/webp', 'large PNG (' + Math.round(bigPng.length / 1024) + 'KB) is converted to WebP before upload: ' + JSON.stringify(up)); }
+{ const up = await saveWithImage(smallPng, 'image/png', 'tiny.png'); ok(up && up[2] === 'image/png', 'small image uploaded unchanged: ' + JSON.stringify(up)); }
+{ const up = await saveWithImage(Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>'), 'image/svg+xml', 'a.svg'); ok(up && up[2] === 'image/svg+xml', 'SVG uploaded unchanged'); }
+
+console.log('Service packages');
+await p.selectOption('#pkg-service', 'design'); await p.fill('#pkg-text', 'بدون عنوان'); await p.click('#pkg-save'); await p.waitForTimeout(150);
+ok((await p.textContent('#pkg-msg')).includes('ابدأ كل باقة') && !JSON.stringify(await p.evaluate(() => __ops)).includes('"pkg"'), 'rejects text without a # package heading');
+await p.fill('#pkg-text', '# الأساسية\nالسعر: 100\n- ميزة'); await p.click('#pkg-save'); await p.waitForTimeout(200);
+ok(JSON.stringify(await p.evaluate(() => __ops)).includes('["pkg","{\\"design\\":\\"# الأساسية'), 'saved under servicePackages.design: ' + JSON.stringify((await p.evaluate(() => __ops)).filter(o => o[0] === 'pkg')));
+ok((await p.$$eval('#pkg-service option', o => o.map(x => x.value))).includes('apps-svc'), 'service list includes Firestore services');
+console.log('Subscribers');
+ok((await p.textContent('#subs-count')).includes('2 نشط من 3'), 'subscriber count: ' + await p.textContent('#subs-count'));
+ok((await p.$$('#subs .item')).length === 2, 'default filter shows active only');
+{ const [dl] = await Promise.all([p.waitForEvent('download'), p.click('#export-subs')]); const fsm = await import('fs'); const csv = fsm.readFileSync(await dl.path(), 'utf8');
+  ok(csv.startsWith('\ufeffemail,source,subscribed_at') && csv.includes('"s1@x.co","article"') && csv.includes('"\'=cmd@x.co"') && !csv.includes('old@x.co'), 'CSV: BOM, active only, formula-injection escaped: ' + JSON.stringify(csv)); }
+
 ok((await p.textContent('#dashboard')).includes('يدعم تنسيق Markdown'), 'markdown hint visible');
 console.log('Private file upload');
 const PDF = Buffer.from('%PDF-1.7\n%âãÏÓ\n1 0 obj\n<<>>\nendobj\n');

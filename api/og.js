@@ -2,6 +2,8 @@
 // تُستدعى فقط عبر قاعدة rewrites في vercel.json لروبوتات المعاينة. الزوار العاديون لا يمرون بها.
 // عند أي فشل تُرجع الصفحة الأصلية كما هي.
 
+import { md } from './_md.js';
+
 const PROJECT = 'kian-al-etihad';
 const KEY = 'AIzaSyBBIT4gfDSQmYltoqW1V7Th6vefiGXg-bI'; // نفس مفتاح الواجهة العام
 const SITE = 'كيان للبرمجيات';
@@ -13,6 +15,8 @@ const val = (v) => {
   if (!v) return null;
   if ('stringValue' in v) return v.stringValue;
   if ('booleanValue' in v) return v.booleanValue;
+  if ('integerValue' in v) return Number(v.integerValue);
+  if ('doubleValue' in v) return v.doubleValue;
   if ('mapValue' in v) return fields(v.mapValue.fields);
   return null;
 };
@@ -119,11 +123,20 @@ export async function GET(request) {
       `<meta name="twitter:description" content="${esc(ogDesc)}">` +
       `<meta name="twitter:image" content="${esc(img)}">`;
 
+    // محتوى الصفحة كاملاً داخل <main> لروبوتات البحث والمعاينة. المتصفح يستبدله فور تشغيل الجافاسكربت.
+    const bodyText = String(doc.content || doc.description || '');
+    const prerender =
+      `<main id="app"><section class="detail"><div class="wrap"><h1>${esc(pageTitle)}</h1>` +
+      (desc ? `<p class="lead">${esc(desc)}</p>` : '') +
+      (ownImg ? `<img src="${esc(img)}" alt="${esc(pageTitle)}" width="1200" height="630">` : '') +
+      `<div class="content-body md">${md(bodyText)}</div></div></section></main>`;
+
     const page = original
       .replace(/<title>[\s\S]*?<\/title>/i, '')
       .replace(/<meta\s+(?:name|property)="(?:description|og:[a-z:_]+|twitter:[a-z:_]+)"[^>]*>/gi, '')
       .replace(/<link\s+rel="canonical"[^>]*>/i, '')
-      .replace('</head>', tags + '</head>');
+      .replace('</head>', tags + '</head>')
+      .replace(/<main id="app">[\s\S]*?<\/main>/, () => prerender);
     return html(page, CACHE_OK);
   } catch {
     return html(original, 'no-store');

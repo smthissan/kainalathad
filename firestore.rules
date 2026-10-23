@@ -109,6 +109,26 @@ service cloud.firestore {
         && d.createdAt == request.time;
     }
 
+    // ---------- مشتركو النشرة البريدية ----------
+    // معرّف المستند هو البريد بحروف صغيرة، فلا يتكرر مشترك. الزائر ينشئ فقط (لا قراءة ولا تعديل)،
+    // وإن كان المشترك موجوداً فمحاولة إنشائه تُرفض. الإدارة وحدها تقرأ وتحدّث وتحذف.
+    match /subscribers/{id} {
+      allow create: if validSubscriber(id, request.resource.data);
+      allow read, update, delete: if isAdmin();
+    }
+
+    function validSubscriber(id, d) {
+      return d.keys().hasOnly(['email', 'source', 'consent', 'status', 'createdAt'])
+        && d.keys().hasAll(['email', 'consent', 'status', 'createdAt'])
+        && str(d.email, 5, 200)
+        && d.email.matches('^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$')
+        && id == d.email.lower()
+        && d.consent == true
+        && str(d.get('source', ''), 0, 60)
+        && d.status == 'active'
+        && d.createdAt == request.time;
+    }
+
     // أي مجموعة أخرى مغلقة افتراضياً
     match /{document=**} {
       allow read, write: if false;

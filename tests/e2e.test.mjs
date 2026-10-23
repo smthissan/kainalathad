@@ -3,7 +3,7 @@ import http from 'http'; import fs from 'fs'; import path from 'path';
 const ROOT = path.resolve(new URL('..', import.meta.url).pathname); const OUT = process.argv[2] || fs.mkdtempSync('/tmp/kian-shots-');
 const vercel = JSON.parse(fs.readFileSync(ROOT + '/vercel.json'));
 const globalHeaders = vercel.headers.find(h => h.source === '/(.*)').headers;
-const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.png': 'image/png', '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.woff2': 'font/woff2', '.webmanifest': 'application/manifest+json' };
+const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.md': 'text/markdown', '.png': 'image/png', '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.woff2': 'font/woff2', '.webmanifest': 'application/manifest+json' };
 const server = http.createServer((req, res) => {
   const u = new URL(req.url, 'http://x'); let p = decodeURIComponent(u.pathname);
   for (const h of globalHeaders) res.setHeader(h.key, h.value);
@@ -26,11 +26,13 @@ const DATA = {
   media: [], portfolio: [['w1', { title: 'متجر إلكتروني لعميل', slug: 'client-store', description: 'مشروع منفذ', published: true, createdAt: new Date('2026-09-01') }]],
   storeProducts: [['p1', { title: 'قالب متجر', slug: 'store-template', description: 'قالب احترافي', content: 'وصف **المنتج**', price: 25, currency: 'USD', category: 'templates', published: true }]],
 };
+const PKG = '# الأساسية\nالسعر: من 100 دولار\n- شعار\n- <b>هوية</b>\n\n# المتقدمة\nالوسم: الأكثر طلباً\nالسعر: من 300 دولار\n- كل ما سبق\n- دليل استخدام';
 const SETTINGS = { social: { whatsapp: '+967700000000', x: 'https://x.com/kian' } };
 
 const fakeModules = {
   'firebase-app.js': `export function initializeApp(c){return {c}}`,
-  'firebase-firestore.js': `export const getFirestore=()=>({});export const collection=(db,name)=>({name});export const serverTimestamp=()=>({__st:true});export const query=(...a)=>a;export const where=()=>({});export const limit=()=>({});
+  'firebase-firestore.js': `export const getFirestore=()=>({});export const collection=(db,name)=>({name});export const doc=(db,name,id)=>({name,id});export const serverTimestamp=()=>({__st:true});export const query=(...a)=>a;export const where=()=>({});export const limit=()=>({});
+export async function setDoc(r,d){(globalThis.__writes||=[]).push({c:r.name,id:r.id,d:JSON.parse(JSON.stringify(d))});if(globalThis.__failWrite){const e=new Error('Missing or insufficient permissions.');e.code='permission-denied';throw e}}
 export async function addDoc(c,d){(globalThis.__writes||=[]).push({c:c.name,d:JSON.parse(JSON.stringify(d))});if(globalThis.__failWrite){const e=new Error('Missing or insufficient permissions.');e.code='permission-denied';throw e}return {id:'new1'}}
 export async function getDocs(){return {docs:[],empty:true,forEach(){}}}`,
   'firebase-auth.js': `export function getAuth(){return globalThis.__auth||(globalThis.__auth={currentUser:globalThis.__mockUser||null,languageCode:null})}
@@ -58,7 +60,7 @@ async function newPage(opts = {}) {
       rows = rows.slice(0, sq.limit || 100);
       return r.fulfill({ contentType: 'application/json', body: JSON.stringify(rows.length ? rows.map(([id, o]) => ({ document: fsDoc(coll, id, sq.select ? Object.fromEntries(Object.entries(o).filter(([k]) => sq.select.fields.some(f => f.fieldPath === k))) : o) })) : [{ readTime: 'x' }]) });
     }
-    if (url.includes('/siteSettings/main')) return r.fulfill({ contentType: 'application/json', body: JSON.stringify({ fields: { social: { mapValue: { fields: { whatsapp: { stringValue: SETTINGS.social.whatsapp }, x: { stringValue: SETTINGS.social.x } } } }, sectionOrder: { arrayValue: { values: ['hero', 'services', 'products', 'articles', 'media', 'about', 'account'].map(v => ({ stringValue: v })) } }, heroButton: { stringValue: 'استكشف منتجاتنا' }, heroButtonUrl: { stringValue: '/products' }, productCategories: { mapValue: { fields: { templates: { mapValue: { fields: { title: { stringValue: 'قوالب جاهزة' }, description: { stringValue: 'وصف معدّل من اللوحة' } } } } } } } } }) });
+    if (url.includes('/siteSettings/main')) return r.fulfill({ contentType: 'application/json', body: JSON.stringify({ fields: { servicePackages: { mapValue: { fields: { design: { stringValue: PKG } } } }, social: { mapValue: { fields: { whatsapp: { stringValue: SETTINGS.social.whatsapp }, x: { stringValue: SETTINGS.social.x } } } }, sectionOrder: { arrayValue: { values: ['hero', 'services', 'products', 'articles', 'media', 'about', 'account'].map(v => ({ stringValue: v })) } }, heroButton: { stringValue: 'استكشف منتجاتنا' }, heroButtonUrl: { stringValue: '/products' }, productCategories: { mapValue: { fields: { templates: { mapValue: { fields: { title: { stringValue: 'قوالب جاهزة' }, description: { stringValue: 'وصف معدّل من اللوحة' } } } } } } } } }) });
     return r.fulfill({ status: 404, body: '{}' });
   });
   const page = await ctx.newPage(); page.__errors = [];
@@ -196,11 +198,67 @@ DATA.articles.push(
   ok(!(await p.$('#next-step')) && (await p.textContent('#related h2')) === 'مقالات ذات صلة' && !(await p.textContent('.crumbs')).includes('الأكاديمية'), 'plain article: no next-step box, no academy breadcrumbs'); }
 
 console.log('Layout overflow');
-for (const mobile of [false, true]) { const p = await newPage({ mobile }); for (const u of ['/', '/contact', '/articles/build-site', '/products/store-template', '/#account', '/about', '/learn', '/articles/first-site-guide']) { await p.goto(B + u); await p.waitForTimeout(500); const [sw, cw] = await p.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth]); ok(sw <= cw, `no horizontal overflow ${mobile ? 'mobile' : 'desktop'} ${u} (${sw}/${cw})`); } }
+for (const mobile of [false, true]) { const p = await newPage({ mobile }); for (const u of ['/', '/contact', '/articles/build-site', '/products/store-template', '/#account', '/about', '/learn', '/articles/first-site-guide', '/tools', '/tools/qr-code', '/tools/invoice', '/privacy']) { await p.goto(B + u); await p.waitForTimeout(500); const [sw, cw] = await p.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth]); ok(sw <= cw, `no horizontal overflow ${mobile ? 'mobile' : 'desktop'} ${u} (${sw}/${cw})`); } }
 { const p = await newPage(); await p.goto(B + '/'); await p.waitForSelector('#social a'); ok((await p.$$eval('#social a', e => e.map(x => x.textContent))).join(',') === 'واتساب,إكس', 'Arabic social labels'); }
 console.log('Static pages');
 { const p = await newPage(); for (const u of ['/about', '/services', '/services/design', '/portfolio', '/no-such-page']) { await p.goto(B + u); await p.waitForTimeout(400); }
   ok(p.__errors.length === 0, 'no errors on static pages: ' + p.__errors.join(' | ')); }
+
+console.log('Newsletter');
+{ const p = await newPage(); await p.goto(B + '/tools'); await p.waitForSelector('.sub-form');
+  const f = '.sub-form';
+  await p.fill(f + ' [name=email]', 'bad'); await p.click(f + ' button'); ok((await p.textContent('.sub-msg')).includes('بريداً'), 'invalid email rejected');
+  await p.fill(f + ' [name=email]', '  Ahmed@Mail.COM '); await p.click(f + ' button'); ok((await p.textContent('.sub-msg')).includes('وافق'), 'consent required');
+  ok(!(await p.evaluate(() => globalThis.__writes)), 'nothing written before consent');
+  await p.check(f + ' [name=consent]'); await p.click(f + ' button'); await p.waitForSelector('.subscribe .notice.ok');
+  const w = await p.evaluate(() => globalThis.__writes), d = w[0].d;
+  ok(w.length === 1 && w[0].c === 'subscribers' && w[0].id === 'ahmed@mail.com' && d.email === 'ahmed@mail.com' && d.consent === true && d.status === 'active' && d.source === 'tool' && d.createdAt.__st && Object.keys(d).every(k => ['email', 'source', 'consent', 'status', 'createdAt'].includes(k)), 'payload matches rules: ' + JSON.stringify(w));
+  ok(p.__errors.length === 0, 'no errors ' + p.__errors.join('|')); }
+{ const p = await newPage(); await p.goto(B + '/tools'); await p.waitForSelector('.sub-form'); await p.evaluate(() => { globalThis.__failWrite = true }); await p.fill('.sub-form [name=email]', 'a@b.co'); await p.check('.sub-form [name=consent]'); await p.click('.sub-form button');
+  await p.waitForFunction(() => document.querySelector('.sub-msg')?.textContent.includes('مشتركاً')); ok(!(await p.$('.subscribe .notice.ok')), 'permission-denied is not shown as success'); }
+{ const p = await newPage(); await p.goto(B + '/tools'); await p.waitForSelector('.sub-form'); await p.fill('.sub-form [name=website]', 'spam'); await p.fill('.sub-form [name=email]', 'a@b.co'); await p.click('.sub-form button');
+  ok(await p.$('.subscribe .notice.ok') && !(await p.evaluate(() => globalThis.__writes)), 'honeypot: fake success, nothing written'); }
+{ const p = await newPage(); await p.goto(B + '/learn'); await p.waitForSelector('.lesson-card, .card, .notice'); ok(true, 'learn page loads'); }
+
+console.log('Tools');
+{ const p = await newPage(); await p.goto(B + '/tools'); await p.waitForSelector('#tool-body .card');
+  ok((await p.$$eval('#tool-body .card a', e => e.map(x => x.getAttribute('href')))).join() === '/tools/qr-code,/tools/invoice', 'tools index links');
+  ok((await p.title()).includes('الأدوات'), 'tools title');
+  await p.goto(B + '/tools/qr-code'); await p.waitForSelector('#qr-text');
+  ok((await p.title()).includes('QR'), 'qr title');
+  await p.fill('#qr-text', 'https://kianalathad.com'); await p.waitForSelector('#qr-out svg');
+  const n1 = await p.$$eval('#qr-out svg path', e => e[0].getAttribute('d').length);
+  await p.selectOption('#qr-level', 'H'); await p.waitForTimeout(100);
+  const n2 = await p.$$eval('#qr-out svg path', e => e[0].getAttribute('d').length);
+  ok(n1 > 100 && n2 > n1, 'QR redraws on level change (' + n1 + ' → ' + n2 + ')');
+  await p.fill('#qr-fg', '#eeeeee'); await p.waitForTimeout(100); ok(!(await p.$eval('#qr-warn', e => e.hidden)), 'low-contrast warning');
+  await p.fill('#qr-text', 'x'.repeat(1000)); await p.waitForTimeout(150); ok(!!(await p.$('#qr-out .notice')) || !!(await p.$('#qr-out svg')), 'long input handled without error');
+  await p.fill('#qr-text', ''); await p.waitForTimeout(100); ok(!(await p.$('#qr-out svg')), 'empty input shows no code');
+  ok(p.__errors.length === 0, 'qr: no errors ' + p.__errors.join('|')); }
+{ const p = await newPage(); await p.goto(B + '/tools/invoice'); await p.waitForSelector('#iv-print');
+  await p.fill('#iv-from', 'كيان <b>x</b>'); await p.fill('.iv-row .d', 'تصميم موقع'); await p.fill('.iv-row .q', '2'); await p.fill('.iv-row .p', '150'); await p.fill('#iv-tax', '15'); await p.fill('#iv-disc', '50');
+  const t = await p.textContent('#iv-print'); ok(t.includes('تصميم موقع') && t.includes('300.00') && t.includes('287.50'), 'invoice totals: (300-50)*1.15 = 287.50: ' + t.replace(/\s+/g, ' ').slice(-200));
+  ok(!(await p.$$eval('#iv-print b', e => e.some(x => x.textContent === 'x'))) && t.includes('<b>x</b>'), 'invoice escapes HTML');
+  await p.click('#iv-add'); ok((await p.$$('.iv-row')).length === 2, 'add row');
+  ok(p.__errors.length === 0, 'invoice: no errors ' + p.__errors.join('|')); }
+
+console.log('Packages');
+{ const p = await newPage(); await p.goto(B + '/services/design'); await p.waitForSelector('.packages .pkg');
+  ok((await p.$$('.packages .pkg')).length === 2, 'two packages rendered');
+  ok((await p.textContent('.pkg.pop')).includes('الأكثر طلباً') && (await p.textContent('.pkg.pop')).includes('من 300 دولار'), 'badge + price');
+  ok(!(await p.$('.packages .pkg b')) && (await p.textContent('.packages')).includes('<b>هوية</b>'), 'package text escaped');
+  const href = await p.getAttribute('.pkg a.btn', 'href'); ok(href === '/contact?package=design%7C%D8%A7%D9%84%D8%A3%D8%B3%D8%A7%D8%B3%D9%8A%D8%A9', 'order link: ' + href);
+  await p.click('.pkg a.btn'); await p.waitForSelector('#contact-form'); ok((await p.inputValue('#c-subject')) === 'طلب باقة: الأساسية', 'contact subject prefilled');
+  await p.goto(B + '/services/web-development'); await p.waitForSelector('.actions'); ok(!(await p.$('.packages')), 'no packages section when none configured');
+  ok(p.__errors.length === 0, 'no errors ' + p.__errors.join('|')); }
+console.log('Header stability');
+for (const [w, h] of [[1350, 63], [1200, 63], [1024, 124], [412, 63]]) {
+  const p = await newPage(); await p.setViewportSize({ width: w, height: 800 }); await p.goto(B + '/learn'); await p.waitForSelector('header');
+  const h0 = await p.$eval('header', e => Math.round(e.getBoundingClientRect().height)); await p.waitForTimeout(600);
+  const h1 = await p.$eval('header', e => Math.round(e.getBoundingClientRect().height));
+  ok(h0 === h && h1 === h, `header height is ${h}px at ${w}px, before and after settings load (${h0} → ${h1})`);
+  await p.close();
+}
 
 console.log('Legal pages');
 for (const [u, h] of [['/privacy', 'سياسة الخصوصية'], ['/terms', 'الشروط والأحكام'], ['/refund', 'سياسة الاسترجاع']]) {
