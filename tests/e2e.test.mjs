@@ -26,6 +26,7 @@ const DATA = {
   media: [], portfolio: [['w1', { title: 'متجر إلكتروني لعميل', slug: 'client-store', description: 'مشروع منفذ', published: true, createdAt: new Date('2026-09-01') }]],
   storeProducts: [['p1', { title: 'قالب متجر', slug: 'store-template', description: 'قالب احترافي', content: 'وصف **المنتج**', price: 25, currency: 'USD', category: 'templates', published: true }]],
 };
+const PKG = '# الأساسية\nالسعر: من 100 دولار\n- شعار\n- <b>هوية</b>\n\n# المتقدمة\nالوسم: الأكثر طلباً\nالسعر: من 300 دولار\n- كل ما سبق\n- دليل استخدام';
 const SETTINGS = { social: { whatsapp: '+967700000000', x: 'https://x.com/kian' } };
 
 const fakeModules = {
@@ -59,7 +60,7 @@ async function newPage(opts = {}) {
       rows = rows.slice(0, sq.limit || 100);
       return r.fulfill({ contentType: 'application/json', body: JSON.stringify(rows.length ? rows.map(([id, o]) => ({ document: fsDoc(coll, id, sq.select ? Object.fromEntries(Object.entries(o).filter(([k]) => sq.select.fields.some(f => f.fieldPath === k))) : o) })) : [{ readTime: 'x' }]) });
     }
-    if (url.includes('/siteSettings/main')) return r.fulfill({ contentType: 'application/json', body: JSON.stringify({ fields: { social: { mapValue: { fields: { whatsapp: { stringValue: SETTINGS.social.whatsapp }, x: { stringValue: SETTINGS.social.x } } } }, sectionOrder: { arrayValue: { values: ['hero', 'services', 'products', 'articles', 'media', 'about', 'account'].map(v => ({ stringValue: v })) } }, heroButton: { stringValue: 'استكشف منتجاتنا' }, heroButtonUrl: { stringValue: '/products' }, productCategories: { mapValue: { fields: { templates: { mapValue: { fields: { title: { stringValue: 'قوالب جاهزة' }, description: { stringValue: 'وصف معدّل من اللوحة' } } } } } } } } }) });
+    if (url.includes('/siteSettings/main')) return r.fulfill({ contentType: 'application/json', body: JSON.stringify({ fields: { servicePackages: { mapValue: { fields: { design: { stringValue: PKG } } } }, social: { mapValue: { fields: { whatsapp: { stringValue: SETTINGS.social.whatsapp }, x: { stringValue: SETTINGS.social.x } } } }, sectionOrder: { arrayValue: { values: ['hero', 'services', 'products', 'articles', 'media', 'about', 'account'].map(v => ({ stringValue: v })) } }, heroButton: { stringValue: 'استكشف منتجاتنا' }, heroButtonUrl: { stringValue: '/products' }, productCategories: { mapValue: { fields: { templates: { mapValue: { fields: { title: { stringValue: 'قوالب جاهزة' }, description: { stringValue: 'وصف معدّل من اللوحة' } } } } } } } } }) });
     return r.fulfill({ status: 404, body: '{}' });
   });
   const page = await ctx.newPage(); page.__errors = [];
@@ -241,6 +242,15 @@ console.log('Tools');
   await p.click('#iv-add'); ok((await p.$$('.iv-row')).length === 2, 'add row');
   ok(p.__errors.length === 0, 'invoice: no errors ' + p.__errors.join('|')); }
 
+console.log('Packages');
+{ const p = await newPage(); await p.goto(B + '/services/design'); await p.waitForSelector('.packages .pkg');
+  ok((await p.$$('.packages .pkg')).length === 2, 'two packages rendered');
+  ok((await p.textContent('.pkg.pop')).includes('الأكثر طلباً') && (await p.textContent('.pkg.pop')).includes('من 300 دولار'), 'badge + price');
+  ok(!(await p.$('.packages .pkg b')) && (await p.textContent('.packages')).includes('<b>هوية</b>'), 'package text escaped');
+  const href = await p.getAttribute('.pkg a.btn', 'href'); ok(href === '/contact?package=design%7C%D8%A7%D9%84%D8%A3%D8%B3%D8%A7%D8%B3%D9%8A%D8%A9', 'order link: ' + href);
+  await p.click('.pkg a.btn'); await p.waitForSelector('#contact-form'); ok((await p.inputValue('#c-subject')) === 'طلب باقة: الأساسية', 'contact subject prefilled');
+  await p.goto(B + '/services/web-development'); await p.waitForSelector('.actions'); ok(!(await p.$('.packages')), 'no packages section when none configured');
+  ok(p.__errors.length === 0, 'no errors ' + p.__errors.join('|')); }
 console.log('Legal pages');
 for (const [u, h] of [['/privacy', 'سياسة الخصوصية'], ['/terms', 'الشروط والأحكام'], ['/refund', 'سياسة الاسترجاع']]) {
   const p = await newPage(); await p.goto(B + u); await p.waitForSelector('#legal-body.content-body h2', { timeout: 8000 });

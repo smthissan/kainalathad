@@ -14,7 +14,7 @@ export async function getDocs(c){const docs=c.n==='contactMessages'?MSGS.filter(
 export async function getDoc(){return {data:()=>({}),exists:()=>true}}
 export async function updateDoc(r,d){__ops.push(['update',r.c,r.i,d.status]);const m=MSGS.find(x=>x.id===r.i);if(m)m.d.status=d.status}
 export async function deleteDoc(r){__ops.push(['delete',r.c,r.i]);(globalThis.__deleted||=[]).push(r.i)}
-export async function setDoc(r,d){if(globalThis.__failSlug&&d.slug===globalThis.__failSlug){const e=new Error('Missing or insufficient permissions.');e.code='permission-denied';throw e}if(globalThis.__hangSlug&&d.slug===globalThis.__hangSlug)return new Promise(()=>{});__ops.push(['set',r.c,d.fileContentType,d.privateFilePath,d.productCategories?JSON.stringify(d.productCategories):undefined,d.track!==undefined?JSON.stringify({track:d.track,relatedProduct:d.relatedProduct,relatedService:d.relatedService}):undefined,JSON.stringify(d),r.i])} export async function addDoc(c,d){__ops.push(['add',c.n,d.action])}`,
+export async function setDoc(r,d){if(globalThis.__failSlug&&d.slug===globalThis.__failSlug){const e=new Error('Missing or insufficient permissions.');e.code='permission-denied';throw e}if(d.servicePackages)__ops.push(['pkg',JSON.stringify(d.servicePackages)]);if(globalThis.__hangSlug&&d.slug===globalThis.__hangSlug)return new Promise(()=>{});__ops.push(['set',r.c,d.fileContentType,d.privateFilePath,d.productCategories?JSON.stringify(d.productCategories):undefined,d.track!==undefined?JSON.stringify({track:d.track,relatedProduct:d.relatedProduct,relatedService:d.relatedService}):undefined,JSON.stringify(d),r.i])} export async function addDoc(c,d){__ops.push(['add',c.n,d.action])}`,
 };
 const b = await chromium.launch(); const p = await b.newPage({ viewport: { width: 1200, height: 900 } }); const errs = [];
 p.on('pageerror', e => errs.push(e.message)); p.on('dialog', d => d.accept());
@@ -34,6 +34,12 @@ ok(JSON.stringify(await p.evaluate(() => __ops)).includes('["update","contactMes
 ok((await p.textContent('#messages-count')) === '', 'counter cleared after read');
 await (await (await p.$$('#messages .item'))[1].$('button.danger')).click(); await p.waitForTimeout(300);
 ok((await p.$$('#messages .item')).length === 1, 'delete works');
+console.log('Service packages');
+await p.selectOption('#pkg-service', 'design'); await p.fill('#pkg-text', 'بدون عنوان'); await p.click('#pkg-save'); await p.waitForTimeout(150);
+ok((await p.textContent('#pkg-msg')).includes('ابدأ كل باقة') && !JSON.stringify(await p.evaluate(() => __ops)).includes('"pkg"'), 'rejects text without a # package heading');
+await p.fill('#pkg-text', '# الأساسية\nالسعر: 100\n- ميزة'); await p.click('#pkg-save'); await p.waitForTimeout(200);
+ok(JSON.stringify(await p.evaluate(() => __ops)).includes('["pkg","{\\"design\\":\\"# الأساسية'), 'saved under servicePackages.design: ' + JSON.stringify((await p.evaluate(() => __ops)).filter(o => o[0] === 'pkg')));
+ok((await p.$$eval('#pkg-service option', o => o.map(x => x.value))).includes('apps-svc'), 'service list includes Firestore services');
 console.log('Subscribers');
 ok((await p.textContent('#subs-count')).includes('2 نشط من 3'), 'subscriber count: ' + await p.textContent('#subs-count'));
 ok((await p.$$('#subs .item')).length === 2, 'default filter shows active only');
