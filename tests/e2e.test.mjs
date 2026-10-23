@@ -278,6 +278,17 @@ console.log('SEO basics');
     await p.goto(B + u); await p.waitForTimeout(250); const d = await p.$eval('meta[name=description]', e => e.content);
     ok(d.length >= 70 && d.length <= 170, `${u}: meta description ${d.length} chars`); } }
 
+console.log('Service pages content');
+{ const p = await newPage();
+  for (const u of ['web-development', 'app-development', 'software-development', 'design']) {
+    await p.goto(B + '/services/' + u); await p.waitForSelector('.content-body h2');
+    const w = (await p.textContent('main')).split(/\s+/).length, h1 = (await p.$$('main h1')).length, h2 = (await p.$$('.content-body h2')).length, faq = (await p.$$('.content-body h3')).length;
+    ok(w >= 250 && h1 === 1 && h2 >= 4 && faq >= 4, `/services/${u}: ${w} words, h1=${h1}, sections=${h2}, faq=${faq}`);
+    const hrefs = await p.$$eval('.content-body a', e => e.map(x => x.getAttribute('href')));
+    ok(hrefs.every(h => /^\/(articles|services|portfolio|contact)/.test(h)) && hrefs.includes('/contact'), `/services/${u}: internal links ok (${hrefs.length})`);
+  }
+  ok(p.__errors.length === 0, 'no errors ' + p.__errors.join('|')); }
+
 console.log('Legal pages');
 for (const [u, h] of [['/privacy', 'سياسة الخصوصية'], ['/terms', 'الشروط والأحكام'], ['/refund', 'سياسة الاسترجاع']]) {
   const p = await newPage(); await p.goto(B + u); await p.waitForSelector('#legal-body.content-body h2', { timeout: 8000 });
