@@ -17,6 +17,7 @@ const val = (v) => {
   if ('booleanValue' in v) return v.booleanValue;
   if ('integerValue' in v) return Number(v.integerValue);
   if ('doubleValue' in v) return v.doubleValue;
+  if ('timestampValue' in v) return v.timestampValue;
   if ('mapValue' in v) return fields(v.mapValue.fields);
   return null;
 };
@@ -57,11 +58,11 @@ async function findDoc(coll, slug) {
 }
 
 // أحدث المستندات المنشورة في مجموعة (الحقول اللازمة للروابط فقط)
-async function listDocs(coll, n) {
+async function listDocs(coll, n, extra = []) {
   const body = {
     structuredQuery: {
       from: [{ collectionId: coll }],
-      select: { fields: ['title', 'slug', 'description', 'excerpt'].map((fieldPath) => ({ fieldPath })) },
+      select: { fields: ['title', 'slug', 'description', 'excerpt', ...extra].map((fieldPath) => ({ fieldPath })) },
       where: { fieldFilter: { field: { fieldPath: 'published' }, op: 'EQUAL', value: { booleanValue: true } } },
       limit: n,
     },
@@ -90,6 +91,33 @@ const LISTS = {
   products: { path: '/products', title: 'المنتجات الرقمية', desc: 'منتجات رقمية جاهزة: كتب إلكترونية وقوالب وسكريبتات وتطبيقات وموارد تصميم، مرتبة حسب النوع.', links: PRODUCT_PAGES, sections: [['storeProducts', '', '/products', 100]] },
 };
 
+// وسوم <head> لصفحة قسم: العنوان والوصف والرابط القانوني وصورة المشاركة الافتراضية
+function withHead(original, origin, path, pageTitle, desc) {
+  const title = `${pageTitle} | ${SITE}`;
+  const canonical = origin + path;
+  const img = `${origin}/og-default.png`;
+  const tags =
+    `<title>${esc(title)}</title>` +
+    `<meta name="description" content="${esc(desc)}">` +
+    `<link rel="canonical" href="${esc(canonical)}">` +
+    `<meta property="og:type" content="website">` +
+    `<meta property="og:site_name" content="${esc(SITE)}">` +
+    `<meta property="og:locale" content="ar_AR">` +
+    `<meta property="og:title" content="${esc(title)}">` +
+    `<meta property="og:description" content="${esc(desc)}">` +
+    `<meta property="og:url" content="${esc(canonical)}">` +
+    `<meta property="og:image" content="${esc(img)}"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">` +
+    `<meta name="twitter:card" content="summary_large_image">` +
+    `<meta name="twitter:title" content="${esc(title)}">` +
+    `<meta name="twitter:description" content="${esc(desc)}">` +
+    `<meta name="twitter:image" content="${esc(img)}">`;
+  return original
+    .replace(/<title>[\s\S]*?<\/title>/i, '')
+    .replace(/<meta\s+(?:name|property)="(?:description|og:[a-z:_]+|twitter:[a-z:_]+)"[^>]*>/gi, '')
+    .replace(/<link\s+rel="canonical"[^>]*>/i, '')
+    .replace('</head>', tags + '</head>');
+}
+
 const linkList = (items) => `<ul>${items.map(([href, t]) => `<li><a href="${esc(href)}">${esc(t)}</a></li>`).join('')}</ul>`;
 
 async function listPage(name, origin, original, html) {
@@ -112,31 +140,44 @@ async function listPage(name, origin, original, html) {
   const prerender = `<main id="app"><section class="detail"><div class="wrap">${body}</div></section></main>`;
   const cache = 'public, max-age=0, s-maxage=600, stale-while-revalidate=86400';
   if (L.home) return html(original.replace(/<main id="app">[\s\S]*?<\/main>/, () => prerender), cache);
-  const title = `${L.title} | ${SITE}`;
-  const canonical = origin + L.path;
-  const img = `${origin}/og-default.png`;
-  const tags =
-    `<title>${esc(title)}</title>` +
-    `<meta name="description" content="${esc(desc)}">` +
-    `<link rel="canonical" href="${esc(canonical)}">` +
-    `<meta property="og:type" content="website">` +
-    `<meta property="og:site_name" content="${esc(SITE)}">` +
-    `<meta property="og:locale" content="ar_AR">` +
-    `<meta property="og:title" content="${esc(title)}">` +
-    `<meta property="og:description" content="${esc(desc)}">` +
-    `<meta property="og:url" content="${esc(canonical)}">` +
-    `<meta property="og:image" content="${esc(img)}"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">` +
-    `<meta name="twitter:card" content="summary_large_image">` +
-    `<meta name="twitter:title" content="${esc(title)}">` +
-    `<meta name="twitter:description" content="${esc(desc)}">` +
-    `<meta name="twitter:image" content="${esc(img)}">`;
-  const page = original
-    .replace(/<title>[\s\S]*?<\/title>/i, '')
-    .replace(/<meta\s+(?:name|property)="(?:description|og:[a-z:_]+|twitter:[a-z:_]+)"[^>]*>/gi, '')
-    .replace(/<link\s+rel="canonical"[^>]*>/i, '')
-    .replace('</head>', tags + '</head>')
-    .replace(/<main id="app">[\s\S]*?<\/main>/, () => prerender);
-  return html(page, cache);
+  return html(withHead(original, origin, L.path, L.title, desc).replace(/<main id="app">[\s\S]*?<\/main>/, () => prerender), cache);
+}
+
+// مسارات الأكاديمية — نسخة مطابقة لـ LEARN_TRACKS في index.html (اختبار tests/og.test.mjs يقارن بينهما)
+const LEARN_TRACKS = [['websites', 'إنشاء المواقع', 'كل ما تحتاجه لبناء موقعك: الدومين والاستضافة وووردبريس والمنصات الجاهزة والسيو.'], ['stores', 'المتاجر الإلكترونية', 'من اختيار منصة المتجر إلى تصميم صفحة المنتج وطرق الدفع والشحن وبناء ثقة العملاء، خطوة بخطوة.'], ['apps', 'تطبيقات الجوال', 'تطوير تطبيقات الجوال بـFlutter خطوة بخطوة: من الفكرة إلى بناء التطبيق ونشره على متاجر التطبيقات.'], ['ai', 'الذكاء الاصطناعي', 'كيف تستخدم أدوات الذكاء الاصطناعي في بناء المواقع وتحريك الصور والعمل بذكاء وأمان، مع حدودها الحقيقية.'], ['digital-products', 'بيع المنتجات الرقمية', 'كيف تصنع منتجاً رقمياً وتسعّره وتبيعه وتسلّمه لعملائك: كتب إلكترونية وقوالب وأدلة، بخطوات عملية.'], ['programming', 'تعلم البرمجة', 'خارطة طريق لتعلم البرمجة للمبتدئين: اختيار اللغة الأولى، والأساسيات، والأدوات، وأول مشروع لك.']];
+const LEARN_INTRO = 'دروس عملية بالعربية في بناء المواقع والمتاجر والتطبيقات وبيع المنتجات الرقمية، مرتبة في مسارات تأخذك خطوة بخطوة.';
+const tsOf = (x) => { const n = Date.parse(x.createdAt ?? x.updatedAt); return Number.isFinite(n) ? n : 0; };
+const lessonCards = (docs) => `<div class="grid">${docs.map((d) => `<article class="card"><h3><a href="/articles/${encodeURIComponent(d.slug || d.id)}">${esc(d.title || 'درس')}</a></h3>${d.description ? `<p>${esc(String(d.description).slice(0, 300))}</p>` : ''}</article>`).join('')}</div>`;
+
+// /learn و /learn/<مسار>: نفس ما تعرضه learnPage() في index.html (الصفحة الرئيسية للأكاديمية تعرض أول 3 دروس من كل مسار)
+async function learnPage(key, origin, original, html) {
+  const tr = key ? LEARN_TRACKS.find((t) => t[0] === key) : null;
+  if (key && !tr) return html(original, 'public, max-age=0, s-maxage=60', 404);
+  let docs;
+  try {
+    docs = await listDocs('articles', 100, ['track', 'createdAt', 'updatedAt']);
+  } catch {
+    return html(original, 'no-store');
+  }
+  const by = {};
+  for (const d of docs.filter((d) => LEARN_TRACKS.some((t) => t[0] === d.track)).sort((a, b) => tsOf(a) - tsOf(b))) (by[d.track] ||= []).push(d);
+  const live = LEARN_TRACKS.filter((t) => (by[t[0]] || []).length);
+  if (tr && !(by[key] || []).length) return html(original, 'public, max-age=0, s-maxage=60', 404);
+  // لا دروس منشورة بعد: الواجهة تضع noindex، فتبقى الصفحة كما هي
+  if (!live.length) return html(original, 'public, max-age=0, s-maxage=60');
+  const title = tr ? tr[1] : 'الأكاديمية';
+  const intro = tr ? tr[2] : LEARN_INTRO;
+  const path = tr ? `/learn/${tr[0]}` : '/learn';
+  let body = `<h1>${esc(title)}</h1><p class="lead">${esc(intro)}</p>`;
+  if (tr) {
+    body += lessonCards(by[key]);
+    const others = live.filter((t) => t[0] !== key);
+    if (others.length) body += `<p>مسارات أخرى:</p>${linkList(others.map((t) => [`/learn/${t[0]}`, t[1]]))}`;
+  } else {
+    body += live.map((t) => `<section><h2><a href="/learn/${t[0]}">${esc(t[1])}</a></h2><p>${esc(t[2])}</p>${lessonCards(by[t[0]].slice(0, 3))}</section>`).join('');
+  }
+  const prerender = `<main id="app"><section class="detail"><div class="wrap">${body}</div></section></main>`;
+  return html(withHead(original, origin, path, title, intro).replace(/<main id="app">[\s\S]*?<\/main>/, () => prerender), 'public, max-age=0, s-maxage=600, stale-while-revalidate=86400');
 }
 
 export async function GET(request) {
@@ -172,6 +213,7 @@ export async function GET(request) {
     });
   }
   if (Object.hasOwn(LISTS, list)) return listPage(list, origin, original, html);
+  if (list === 'learn') return learnPage(url.searchParams.get('track') || '', origin, original, html);
   const doc = await docP;
   if (doc === undefined) return html(original, 'no-store');
   // slug غير موجود أو غير منشور: 404 حقيقي للروبوتات كي لا تُعدّ الصفحة soft-404 (الواجهة تضع noindex للزوار)
