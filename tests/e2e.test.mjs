@@ -28,7 +28,7 @@ const DATA = {
 };
 const PKG = '# الأساسية\nالسعر: من 100 دولار\n- شعار\n- <b>هوية</b>\n\n# المتقدمة\nالوسم: الأكثر طلباً\nالسعر: من 300 دولار\n- كل ما سبق\n- دليل استخدام';
 const TMN = '# أحمد علي\nالصفة: صاحب متجر — صنعاء\nسلّموا في الموعد <b>بدقة</b>.\n\n# سارة\nتعامل احترافي.';
-const SETTINGS = { social: { whatsapp: '+967700000000', x: 'https://x.com/kian' } };
+const SETTINGS = { social: { whatsapp: '+967700000000', x: 'https://x.com/kian', email: 'info@kianalathad.com' } };
 
 const fakeModules = {
   'firebase-app.js': `export function initializeApp(c){return {c}}`,
@@ -61,7 +61,7 @@ async function newPage(opts = {}) {
       rows = rows.slice(0, sq.limit || 100);
       return r.fulfill({ contentType: 'application/json', body: JSON.stringify(rows.length ? rows.map(([id, o]) => ({ document: fsDoc(coll, id, sq.select ? Object.fromEntries(Object.entries(o).filter(([k]) => sq.select.fields.some(f => f.fieldPath === k))) : o) })) : [{ readTime: 'x' }]) });
     }
-    if (url.includes('/siteSettings/main')) return r.fulfill({ contentType: 'application/json', body: JSON.stringify({ fields: { testimonials: { stringValue: TMN }, servicePackages: { mapValue: { fields: { design: { stringValue: PKG } } } }, social: { mapValue: { fields: { whatsapp: { stringValue: SETTINGS.social.whatsapp }, x: { stringValue: SETTINGS.social.x } } } }, sectionOrder: { arrayValue: { values: ['hero', 'services', 'products', 'articles', 'media', 'about', 'account'].map(v => ({ stringValue: v })) } }, heroButton: { stringValue: 'استكشف منتجاتنا' }, heroButtonUrl: { stringValue: '/products' }, productCategories: { mapValue: { fields: { templates: { mapValue: { fields: { title: { stringValue: 'قوالب جاهزة' }, description: { stringValue: 'وصف معدّل من اللوحة' } } } } } } } } }) });
+    if (url.includes('/siteSettings/main')) return r.fulfill({ contentType: 'application/json', body: JSON.stringify({ fields: { testimonials: { stringValue: TMN }, servicePackages: { mapValue: { fields: { design: { stringValue: PKG } } } }, social: { mapValue: { fields: { whatsapp: { stringValue: SETTINGS.social.whatsapp }, x: { stringValue: SETTINGS.social.x }, email: { stringValue: SETTINGS.social.email } } } }, sectionOrder: { arrayValue: { values: ['hero', 'services', 'products', 'articles', 'media', 'about', 'account'].map(v => ({ stringValue: v })) } }, heroButton: { stringValue: 'استكشف منتجاتنا' }, heroButtonUrl: { stringValue: '/products' }, productCategories: { mapValue: { fields: { templates: { mapValue: { fields: { title: { stringValue: 'قوالب جاهزة' }, description: { stringValue: 'وصف معدّل من اللوحة' } } } } } } } } }) });
     return r.fulfill({ status: 404, body: '{}' });
   });
   const page = await ctx.newPage(); page.__errors = [];
@@ -77,7 +77,7 @@ console.log('Home');
   ok(await p.getAttribute('meta[property="og:image"]', 'content') === 'http://localhost:4173/og-default.png', 'default og:image applied by meta()');
   ok(await p.$('link[rel=manifest]') && await p.$('link[rel="apple-touch-icon"]'), 'manifest + apple icon linked');
   for (const a of ['/favicon.svg', '/favicon.ico', '/manifest.webmanifest', '/og-default.png', '/icon-512.png']) { const r = await p.request.get(B + a); ok(r.status() === 200 && !(await r.text()).startsWith('<!doctype'), 'asset served: ' + a); }
-  const ld = JSON.parse(await p.textContent('#schema')); ok(ld.logo && ld.sameAs?.[0] === 'https://x.com/kian' && !ld.sameAs.some(s => s.includes('wa.me')), 'Organization schema has logo + sameAs');
+  const ld = JSON.parse(await p.textContent('#schema')); ok(ld.logo && ld.sameAs?.[0] === 'https://x.com/kian' && !ld.sameAs.some(s => s.includes('wa.me') || s.includes('mailto')) && ld.email === 'info@kianalathad.com', 'Organization schema has logo + sameAs + email');
   await p.waitForSelector('#home-products .card'); ok(await p.$('#home-products a[href="/products/store-template"]') && (await p.textContent('#home-products')).includes('USD 25'), 'home shows real products with price');
   ok(await p.getAttribute('#hero-button', 'href') === '/products' && (await p.textContent('#hero-button')) === 'استكشف منتجاتنا', 'hero button respects admin settings (/products)');
   ok(await p.$('#navlinks a[href="/products"]') && await p.$('#tabbar a[href="/products"]'), 'products link in top menu + bottom bar');
@@ -143,6 +143,8 @@ console.log('Product order');
 console.log('Contact');
 { const p = await newPage(); await p.goto(B + '/contact'); await p.waitForSelector('#contact-form');
   ok(await p.getAttribute('.alt-contact a', 'href') === 'https://wa.me/967700000000', 'WhatsApp alternative link');
+  ok(await p.getAttribute('.alt-contact a[href^="mailto:"]', 'href') === 'mailto:info@kianalathad.com' && (await p.textContent('.alt-contact')).includes('info@kianalathad.com'), 'email alternative link');
+  ok(await p.getAttribute('#social a[href^="mailto:"]', 'href') === 'mailto:info@kianalathad.com', 'email link in footer contact list');
   await p.click('#c-send'); ok((await p.textContent('#c-msg')).includes('اسمك'), 'name required');
   await p.fill('#c-name', 'أحمد'); await p.fill('#c-email', 'bad'); await p.click('#c-send'); ok((await p.textContent('#c-msg')).includes('بريداً'), 'email validated');
   await p.fill('#c-email', 'ahmed@mail.com'); await p.fill('#c-message', 'قصير'); await p.click('#c-send'); ok((await p.textContent('#c-msg')).includes('10'), 'message min length');
@@ -202,7 +204,7 @@ DATA.articles.push(
 
 console.log('Layout overflow');
 for (const mobile of [false, true]) { const p = await newPage({ mobile }); for (const u of ['/', '/contact', '/articles/build-site', '/products/store-template', '/#account', '/about', '/learn', '/articles/first-site-guide', '/tools', '/tools/qr-code', '/tools/invoice', '/privacy']) { await p.goto(B + u); await p.waitForTimeout(500); const [sw, cw] = await p.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth]); ok(sw <= cw, `no horizontal overflow ${mobile ? 'mobile' : 'desktop'} ${u} (${sw}/${cw})`); } }
-{ const p = await newPage(); await p.goto(B + '/'); await p.waitForSelector('#social a'); ok((await p.$$eval('#social a', e => e.map(x => x.textContent))).join(',') === 'واتساب,إكس', 'Arabic social labels'); }
+{ const p = await newPage(); await p.goto(B + '/'); await p.waitForSelector('#social a'); ok((await p.$$eval('#social a', e => e.map(x => x.textContent))).join(',') === 'واتساب,إكس,البريد', 'Arabic social labels'); }
 console.log('Static pages');
 { const p = await newPage(); for (const u of ['/about', '/services', '/services/design', '/portfolio', '/no-such-page']) { await p.goto(B + u); await p.waitForTimeout(400); }
   ok(p.__errors.length === 0, 'no errors on static pages: ' + p.__errors.join(' | ')); }
