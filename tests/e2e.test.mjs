@@ -78,6 +78,8 @@ console.log('Home');
   ok(await p.$('link[rel=manifest]') && await p.$('link[rel="apple-touch-icon"]'), 'manifest + apple icon linked');
   for (const a of ['/favicon.svg', '/favicon.ico', '/manifest.webmanifest', '/og-default.png', '/icon-512.png']) { const r = await p.request.get(B + a); ok(r.status() === 200 && !(await r.text()).startsWith('<!doctype'), 'asset served: ' + a); }
   const ld = JSON.parse(await p.textContent('#schema')); ok(ld.logo && ld.sameAs?.[0] === 'https://x.com/kian' && !ld.sameAs.some(s => s.includes('wa.me') || s.includes('mailto')) && ld.email === 'info@kianalathad.com', 'Organization schema has logo + sameAs + email');
+  ok(ld['@type'] === 'ProfessionalService' && ld.address?.addressLocality === 'صنعاء' && ld.address?.addressCountry === 'YE' && ld.telephone === '+967700000000', 'local business schema: Sana\'a address + phone');
+  ok(await p.getAttribute('footer a[hreflang="en"]', 'href') === '/en', 'footer links to the English page');
   await p.waitForSelector('#home-products .card'); ok(await p.$('#home-products a[href="/products/store-template"]') && (await p.textContent('#home-products')).includes('USD 25'), 'home shows real products with price');
   ok(await p.getAttribute('#hero-button', 'href') === '/products' && (await p.textContent('#hero-button')) === 'استكشف منتجاتنا', 'hero button respects admin settings (/products)');
   ok(await p.$('#navlinks a[href="/products"]') && await p.$('#tabbar a[href="/products"]'), 'products link in top menu + bottom bar');
@@ -294,6 +296,18 @@ console.log('Service pages content');
   }
   ok(p.__errors.length === 0, 'no errors ' + p.__errors.join('|')); }
 
+console.log('English page');
+{ const rw = vercel.rewrites; const i = rw.findIndex(r => r.source === '/en'); ok(i >= 0 && rw[i].destination === '/en.html' && i < rw.findIndex(r => r.destination === '/index.html'), 'vercel: /en → /en.html before the SPA fallback');
+  for (const mobile of [false, true]) { const p = await newPage({ mobile }); await p.goto(B + '/en.html'); await p.waitForSelector('#contact-btns a[href^="mailto:"]');
+    ok(await p.getAttribute('html', 'lang') === 'en' && await p.getAttribute('html', 'dir') === 'ltr', 'English page is lang=en, ltr');
+    ok(await p.getAttribute('link[rel=canonical]', 'href') === 'https://kianalathad.com/en' && await p.getAttribute('link[hreflang=ar]', 'href') === 'https://kianalathad.com/', 'canonical + hreflang');
+    const ld = JSON.parse(await p.textContent('script[type="application/ld+json"]')); ok(ld['@type'] === 'ProfessionalService' && ld.address.addressCountry === 'YE', 'English page schema');
+    const btns = await p.$$eval('#contact-btns a', a => a.map(x => x.getAttribute('href')));
+    ok(btns[0].startsWith('https://wa.me/967700000000?text=') && btns[1].startsWith('mailto:info@kianalathad.com') && btns[2] === '/contact', 'WhatsApp + email from settings, form last: ' + btns.join(' '));
+    ok(await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'no horizontal overflow' + (mobile ? ' (mobile)' : ''));
+    ok(p.__errors.length === 0, 'no console/CSP errors: ' + p.__errors.join(' | '));
+    await p.screenshot({ path: OUT + (mobile ? '/en-mobile.png' : '/en.png'), fullPage: true }); } }
+
 console.log('Legal pages');
 for (const [u, h] of [['/privacy', 'سياسة الخصوصية'], ['/terms', 'الشروط والأحكام'], ['/refund', 'سياسة الاسترجاع']]) {
   const p = await newPage(); await p.goto(B + u); await p.waitForSelector('#legal-body.content-body h2', { timeout: 8000 });
@@ -305,7 +319,7 @@ for (const [u, h] of [['/privacy', 'سياسة الخصوصية'], ['/terms', '�
   await p.close();
 }
 { const p = await newPage(); await p.goto(B + '/'); await p.waitForSelector('footer .flinks');
-  ok((await p.$$eval('footer .flinks a', e => e.map(x => x.getAttribute('href')))).join() === '/privacy,/terms,/refund', 'footer links to the three legal pages'); }
+  ok((await p.$$eval('footer .flinks a:not([hreflang])', e => e.map(x => x.getAttribute('href')))).join() === '/privacy,/terms,/refund', 'footer links to the three legal pages'); }
 
 await browser.close(); server.close();
 console.log(failures ? `\n${failures} FAILED` : '\nALL PASSED'); process.exit(failures ? 1 : 0);

@@ -19,6 +19,7 @@ const STATIC_PAGES = [
   ['/portfolio', 'weekly', '0.9'],
   ['/about', 'monthly', '0.7'],
   ['/contact', 'monthly', '0.8'],
+  ['/en', 'monthly', '0.8'],
   ['/tools', 'monthly', '0.7'],
   ['/tools/qr-code', 'monthly', '0.7'],
   ['/tools/invoice', 'monthly', '0.7'],
