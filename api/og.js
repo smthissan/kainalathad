@@ -81,6 +81,8 @@ async function listDocs(coll, n) {
 const SERVICE_PAGES = [['/services/web-development', 'تطوير المواقع'], ['/services/app-development', 'تطوير التطبيقات'], ['/services/software-development', 'البرمجيات والحلول الرقمية'], ['/services/design', 'التصميم']];
 const PRODUCT_PAGES = [['/products/apps', 'التطبيقات'], ['/products/templates', 'القوالب'], ['/products/scripts', 'السكريبتات'], ['/products/ebooks', 'الكتب الإلكترونية'], ['/products/design-resources', 'موارد التصميم']];
 const LISTS = {
+  // الرئيسية تصلها عبر middleware.js (ملف index.html الثابت يسبق قواعد vercel.json). تحتفظ بوسوم <head> الأصلية.
+  home: { path: '/', home: true, h1: 'نبني حلولًا رقمية تصنع الفرق', desc: 'كيان للبرمجيات يقدم تطوير المواقع والتطبيقات والحلول البرمجية والتصميم.', links: [...SERVICE_PAGES, ['/learn', 'الأكاديمية'], ['/products', 'المنتجات الرقمية'], ['/portfolio', 'أعمالنا'], ['/contact', 'تواصل معنا']], sections: [['services', 'الخدمات', '/services', 12], ['articles', 'أحدث المقالات', '/articles', 6], ['portfolio', 'أعمالنا', '/portfolio', 6]] },
   articles: { path: '/articles', title: 'المقالات', desc: 'مقالات ودروس عملية بالعربية في إنشاء المواقع والمتاجر والتطبيقات والتصميم والبرمجة من فريق كيان للبرمجيات.', sections: [['articles', '', '/articles', 60]] },
   services: { path: '/services', title: 'الخدمات', desc: 'خدمات كيان للبرمجيات: تطوير المواقع والتطبيقات والبرمجيات المخصصة وخدمات التصميم للأفراد والشركات.', links: SERVICE_PAGES, sections: [['services', '', '/services', 60]] },
   media: { path: '/media', title: 'الوسائط', desc: 'معرض صور ومحتوى مرئي من أعمال وأنشطة كيان للبرمجيات في تطوير المواقع والتطبيقات والتصميم.', sections: [['media', '', '/media', 60]] },
@@ -99,7 +101,7 @@ async function listPage(name, origin, original, html) {
     return html(original, 'no-store');
   }
   const desc = L.desc || '';
-  let body = `<h1>${esc(L.title)}</h1>` + (desc ? `<p class="lead">${esc(desc)}</p>` : '') + (L.links ? `<nav>${linkList(L.links)}</nav>` : '');
+  let body = `<h1>${esc(L.h1 || L.title)}</h1>` + (desc ? `<p class="lead">${esc(desc)}</p>` : '') + (L.links ? `<nav>${linkList(L.links)}</nav>` : '');
   L.sections.forEach(([, heading, base], i) => {
     const docs = groups[i].filter((d) => d.title);
     if (!docs.length) return;
@@ -108,6 +110,8 @@ async function listPage(name, origin, original, html) {
       `<div class="grid">${docs.map((d) => `<article class="card"><h3><a href="${base}/${encodeURIComponent(d.slug || d.id)}">${esc(d.title)}</a></h3>${d.description || d.excerpt ? `<p>${esc(String(d.description || d.excerpt).slice(0, 300))}</p>` : ''}</article>`).join('')}</div>`;
   });
   const prerender = `<main id="app"><section class="detail"><div class="wrap">${body}</div></section></main>`;
+  const cache = 'public, max-age=0, s-maxage=600, stale-while-revalidate=86400';
+  if (L.home) return html(original.replace(/<main id="app">[\s\S]*?<\/main>/, () => prerender), cache);
   const title = `${L.title} | ${SITE}`;
   const canonical = origin + L.path;
   const img = `${origin}/og-default.png`;
@@ -132,7 +136,7 @@ async function listPage(name, origin, original, html) {
     .replace(/<link\s+rel="canonical"[^>]*>/i, '')
     .replace('</head>', tags + '</head>')
     .replace(/<main id="app">[\s\S]*?<\/main>/, () => prerender);
-  return html(page, 'public, max-age=0, s-maxage=600, stale-while-revalidate=86400');
+  return html(page, cache);
 }
 
 export async function GET(request) {
