@@ -56,10 +56,90 @@ async function findDoc(coll, slug) {
   return null;
 }
 
+// أحدث المستندات المنشورة في مجموعة (الحقول اللازمة للروابط فقط)
+async function listDocs(coll, n) {
+  const body = {
+    structuredQuery: {
+      from: [{ collectionId: coll }],
+      select: { fields: ['title', 'slug', 'description', 'excerpt'].map((fieldPath) => ({ fieldPath })) },
+      where: { fieldFilter: { field: { fieldPath: 'published' }, op: 'EQUAL', value: { booleanValue: true } } },
+      limit: n,
+    },
+  };
+  const r = await fetch(`${BASE}:runQuery?key=${KEY}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(2500),
+  });
+  if (!r.ok) throw new Error(`list ${r.status}`);
+  return (await r.json()).filter((x) => x.document).map((x) => ({ id: x.document.name.split('/').pop(), ...fields(x.document.fields) }));
+}
+
+// صفحات الأقسام لروبوتات البحث (الرئيسية / ملف ثابت فلا تصلها قواعد rewrites). العناوين والأوصاف مطابقة لـ routeSeo في index.html.
+// sections: [المجموعة في Firestore, عنوان القسم, مسار الروابط, العدد]
+const SERVICE_PAGES = [['/services/web-development', 'تطوير المواقع'], ['/services/app-development', 'تطوير التطبيقات'], ['/services/software-development', 'البرمجيات والحلول الرقمية'], ['/services/design', 'التصميم']];
+const PRODUCT_PAGES = [['/products/apps', 'التطبيقات'], ['/products/templates', 'القوالب'], ['/products/scripts', 'السكريبتات'], ['/products/ebooks', 'الكتب الإلكترونية'], ['/products/design-resources', 'موارد التصميم']];
+const LISTS = {
+  articles: { path: '/articles', title: 'المقالات', desc: 'مقالات ودروس عملية بالعربية في إنشاء المواقع والمتاجر والتطبيقات والتصميم والبرمجة من فريق كيان للبرمجيات.', sections: [['articles', '', '/articles', 60]] },
+  services: { path: '/services', title: 'الخدمات', desc: 'خدمات كيان للبرمجيات: تطوير المواقع والتطبيقات والبرمجيات المخصصة وخدمات التصميم للأفراد والشركات.', links: SERVICE_PAGES, sections: [['services', '', '/services', 60]] },
+  media: { path: '/media', title: 'الوسائط', desc: 'معرض صور ومحتوى مرئي من أعمال وأنشطة كيان للبرمجيات في تطوير المواقع والتطبيقات والتصميم.', sections: [['media', '', '/media', 60]] },
+  portfolio: { path: '/portfolio', title: 'أعمالنا', desc: 'نماذج من مشاريع كيان للبرمجيات: مواقع ومتاجر وتطبيقات نفّذناها لعملائنا، مع تفاصيل كل مشروع.', sections: [['portfolio', '', '/portfolio', 60]] },
+  products: { path: '/products', title: 'المنتجات الرقمية', desc: 'منتجات رقمية جاهزة: كتب إلكترونية وقوالب وسكريبتات وتطبيقات وموارد تصميم، مرتبة حسب النوع.', links: PRODUCT_PAGES, sections: [['storeProducts', '', '/products', 100]] },
+};
+
+const linkList = (items) => `<ul>${items.map(([href, t]) => `<li><a href="${esc(href)}">${esc(t)}</a></li>`).join('')}</ul>`;
+
+async function listPage(name, origin, original, html) {
+  const L = LISTS[name];
+  let groups;
+  try {
+    groups = await Promise.all(L.sections.map(([coll, , , n]) => listDocs(coll, n)));
+  } catch {
+    return html(original, 'no-store');
+  }
+  const desc = L.desc || '';
+  let body = `<h1>${esc(L.title)}</h1>` + (desc ? `<p class="lead">${esc(desc)}</p>` : '') + (L.links ? `<nav>${linkList(L.links)}</nav>` : '');
+  L.sections.forEach(([, heading, base], i) => {
+    const docs = groups[i].filter((d) => d.title);
+    if (!docs.length) return;
+    body +=
+      (heading ? `<h2><a href="${base}">${esc(heading)}</a></h2>` : '') +
+      `<div class="grid">${docs.map((d) => `<article class="card"><h3><a href="${base}/${encodeURIComponent(d.slug || d.id)}">${esc(d.title)}</a></h3>${d.description || d.excerpt ? `<p>${esc(String(d.description || d.excerpt).slice(0, 300))}</p>` : ''}</article>`).join('')}</div>`;
+  });
+  const prerender = `<main id="app"><section class="detail"><div class="wrap">${body}</div></section></main>`;
+  const title = `${L.title} | ${SITE}`;
+  const canonical = origin + L.path;
+  const img = `${origin}/og-default.png`;
+  const tags =
+    `<title>${esc(title)}</title>` +
+    `<meta name="description" content="${esc(desc)}">` +
+    `<link rel="canonical" href="${esc(canonical)}">` +
+    `<meta property="og:type" content="website">` +
+    `<meta property="og:site_name" content="${esc(SITE)}">` +
+    `<meta property="og:locale" content="ar_AR">` +
+    `<meta property="og:title" content="${esc(title)}">` +
+    `<meta property="og:description" content="${esc(desc)}">` +
+    `<meta property="og:url" content="${esc(canonical)}">` +
+    `<meta property="og:image" content="${esc(img)}"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">` +
+    `<meta name="twitter:card" content="summary_large_image">` +
+    `<meta name="twitter:title" content="${esc(title)}">` +
+    `<meta name="twitter:description" content="${esc(desc)}">` +
+    `<meta name="twitter:image" content="${esc(img)}">`;
+  const page = original
+    .replace(/<title>[\s\S]*?<\/title>/i, '')
+    .replace(/<meta\s+(?:name|property)="(?:description|og:[a-z:_]+|twitter:[a-z:_]+)"[^>]*>/gi, '')
+    .replace(/<link\s+rel="canonical"[^>]*>/i, '')
+    .replace('</head>', tags + '</head>')
+    .replace(/<main id="app">[\s\S]*?<\/main>/, () => prerender);
+  return html(page, 'public, max-age=0, s-maxage=600, stale-while-revalidate=86400');
+}
+
 export async function GET(request) {
   const url = new URL(request.url);
   const host = request.headers.get('x-forwarded-host') || url.host;
   const origin = `https://${host}`;
+  const list = url.searchParams.get('list') || '';
   const coll = url.searchParams.get('c') || '';
   let slug = url.searchParams.get('slug') || '';
   if (slug.includes('%')) { try { slug = decodeURIComponent(slug); } catch {} }
@@ -87,6 +167,7 @@ export async function GET(request) {
       headers: { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store', 'retry-after': '120' },
     });
   }
+  if (Object.hasOwn(LISTS, list)) return listPage(list, origin, original, html);
   const doc = await docP;
   if (doc === undefined) return html(original, 'no-store');
   // slug غير موجود أو غير منشور: 404 حقيقي للروبوتات كي لا تُعدّ الصفحة soft-404 (الواجهة تضع noindex للزوار)
