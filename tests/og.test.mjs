@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { md } from '../api/_md.js';
-import { GET } from '../api/og.js';
+import { GET, parseTestimonials } from '../api/og.js';
 
 const R = new URL('../', import.meta.url).pathname;
 const index = readFileSync(R + 'index.html', 'utf8');
@@ -135,6 +135,32 @@ test('home: crawler content keeps the original <head>', async () => {
   assert.match(main, /<a href="\/articles\/a">مقال<\/a>/);
   assert.equal(h.replace(/<main id="app">[\s\S]*?<\/main>/, ''), index.replace(/<main id="app">[\s\S]*?<\/main>/, ''));
   assert.ok(index.includes(`<meta name="description" content="كيان للبرمجيات يقدم تطوير المواقع والتطبيقات والحلول البرمجية والتصميم.">`));
+});
+
+const clientTmn = new Function(`${grab(/function parseTestimonials\(t\)\{.*\}\n/)}\nreturn parseTestimonials`)();
+const TMN = ['مقدمة بلا اسم تُتجاهل', '# أحمد علي', 'الصفة: صاحب متجر — صنعاء', 'سلّموا في الموعد،', 'والطلبات تضاعفت.', '', '# بلا نص', 'الصفة: لا شيء', '', '# سارة', 'Role: Marketing', 'تعامل <b>احترافي</b>.'].join('\r\n');
+
+test('server parseTestimonials() matches the client and drops entries without a quote', () => {
+  const a = parseTestimonials(TMN);
+  assert.deepEqual(a, clientTmn(TMN));
+  assert.deepEqual(a, [
+    { name: 'أحمد علي', role: 'صاحب متجر — صنعاء', quote: 'سلّموا في الموعد، والطلبات تضاعفت.' },
+    { name: 'سارة', role: 'Marketing', quote: 'تعامل <b>احترافي</b>.' },
+  ]);
+  assert.deepEqual(parseTestimonials(undefined), []);
+});
+
+test('home: testimonials from siteSettings are rendered (escaped) for crawlers', async () => {
+  stubList({});
+  const listFetch = globalThis.fetch;
+  globalThis.fetch = async (url, opts) => String(url).includes('/siteSettings/main?')
+    ? new Response(JSON.stringify({ fields: f({ testimonials: TMN }) }), { status: 200 })
+    : listFetch(url, opts);
+  const main = (await (await GET(listReq('home'))).text()).match(/<main id="app">([\s\S]*?)<\/main>/)[1];
+  assert.match(main, /<h2>ماذا يقول عملاؤنا<\/h2>/);
+  assert.match(main, /<blockquote>سلّموا في الموعد، والطلبات تضاعفت.<\/blockquote><figcaption><b>أحمد علي<\/b> — صاحب متجر — صنعاء<\/figcaption>/);
+  assert.match(main, /تعامل &lt;b&gt;احترافي&lt;\/b&gt;\./);
+  assert.doesNotMatch(main, /بلا نص/);
 });
 
 test('middleware: rewrites bots on / to the home list, lets visitors through', async () => {

@@ -27,6 +27,7 @@ const DATA = {
   storeProducts: [['p1', { title: 'قالب متجر', slug: 'store-template', description: 'قالب احترافي', content: 'وصف **المنتج**', price: 25, currency: 'USD', category: 'templates', published: true }]],
 };
 const PKG = '# الأساسية\nالسعر: من 100 دولار\n- شعار\n- <b>هوية</b>\n\n# المتقدمة\nالوسم: الأكثر طلباً\nالسعر: من 300 دولار\n- كل ما سبق\n- دليل استخدام';
+const TMN = '# أحمد علي\nالصفة: صاحب متجر — صنعاء\nسلّموا في الموعد <b>بدقة</b>.\n\n# سارة\nتعامل احترافي.';
 const SETTINGS = { social: { whatsapp: '+967700000000', x: 'https://x.com/kian' } };
 
 const fakeModules = {
@@ -60,7 +61,7 @@ async function newPage(opts = {}) {
       rows = rows.slice(0, sq.limit || 100);
       return r.fulfill({ contentType: 'application/json', body: JSON.stringify(rows.length ? rows.map(([id, o]) => ({ document: fsDoc(coll, id, sq.select ? Object.fromEntries(Object.entries(o).filter(([k]) => sq.select.fields.some(f => f.fieldPath === k))) : o) })) : [{ readTime: 'x' }]) });
     }
-    if (url.includes('/siteSettings/main')) return r.fulfill({ contentType: 'application/json', body: JSON.stringify({ fields: { servicePackages: { mapValue: { fields: { design: { stringValue: PKG } } } }, social: { mapValue: { fields: { whatsapp: { stringValue: SETTINGS.social.whatsapp }, x: { stringValue: SETTINGS.social.x } } } }, sectionOrder: { arrayValue: { values: ['hero', 'services', 'products', 'articles', 'media', 'about', 'account'].map(v => ({ stringValue: v })) } }, heroButton: { stringValue: 'استكشف منتجاتنا' }, heroButtonUrl: { stringValue: '/products' }, productCategories: { mapValue: { fields: { templates: { mapValue: { fields: { title: { stringValue: 'قوالب جاهزة' }, description: { stringValue: 'وصف معدّل من اللوحة' } } } } } } } } }) });
+    if (url.includes('/siteSettings/main')) return r.fulfill({ contentType: 'application/json', body: JSON.stringify({ fields: { testimonials: { stringValue: TMN }, servicePackages: { mapValue: { fields: { design: { stringValue: PKG } } } }, social: { mapValue: { fields: { whatsapp: { stringValue: SETTINGS.social.whatsapp }, x: { stringValue: SETTINGS.social.x } } } }, sectionOrder: { arrayValue: { values: ['hero', 'services', 'products', 'articles', 'media', 'about', 'account'].map(v => ({ stringValue: v })) } }, heroButton: { stringValue: 'استكشف منتجاتنا' }, heroButtonUrl: { stringValue: '/products' }, productCategories: { mapValue: { fields: { templates: { mapValue: { fields: { title: { stringValue: 'قوالب جاهزة' }, description: { stringValue: 'وصف معدّل من اللوحة' } } } } } } } } }) });
     return r.fulfill({ status: 404, body: '{}' });
   });
   const page = await ctx.newPage(); page.__errors = [];
@@ -82,8 +83,10 @@ console.log('Home');
   ok(await p.$('#navlinks a[href="/products"]') && await p.$('#tabbar a[href="/products"]'), 'products link in top menu + bottom bar');
   await p.waitForSelector('#home-media .card'); ok(await p.$('#home-media a[href="/portfolio/client-store"]') && await p.getAttribute('#media-title + a.more', 'href') === '/portfolio', 'portfolio items shown in home works section');
   ok(await p.$('#navlinks a[href="/learn"]'), 'academy link in top menu'); await p.waitForTimeout(300); ok(!(await p.$('#learn-title')), 'no academy section on home while there are no lessons');
+  const tmn = await p.$$eval('#testimonials-title ~ .grid .tmn', fs => fs.map(f => f.textContent)); ok(tmn.length === 2 && tmn[0].includes('أحمد علي') && tmn[0].includes('صاحب متجر — صنعاء') && tmn[0].includes('<b>بدقة</b>'), 'testimonials rendered and escaped');
+  ok(await p.$eval('#testimonials-title', h => { const s = h.closest('section'); return !!s.previousElementSibling?.querySelector('#media-title') && !!s.nextElementSibling?.querySelector('.cta-band') }), 'testimonials sit between works and the CTA');
   ok(p.__errors.length === 0, 'no console/CSP errors: ' + p.__errors.join(' | '));
-  await p.screenshot({ path: OUT + '/home.png' }); }
+  await p.screenshot({ path: OUT + '/home.png', fullPage: true }); }
 
 console.log('Portfolio');
 { const p = await newPage(); await p.goto(B + '/portfolio'); await p.waitForSelector('#portfolio-grid .card'); ok(await p.$('#portfolio-grid a[href="/portfolio/client-store"]'), 'portfolio page lists item');
