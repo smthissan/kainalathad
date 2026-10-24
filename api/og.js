@@ -118,11 +118,29 @@ function withHead(original, origin, path, pageTitle, desc) {
     .replace('</head>', tags + '</head>');
 }
 
+// مطابقة parseTestimonials في index.html (يفحصها tests/og.test.mjs)
+export function parseTestimonials(t){const out=[];let c=null;for(const raw of String(t||'').replace(/\r/g,'').split('\n')){const l=raw.trim();if(!l)continue;let m=/^#\s*(.+)$/.exec(l);if(m){if(out.length>=9)break;c={name:m[1].slice(0,80),role:'',quote:''};out.push(c);continue}if(!c)continue;m=/^(?:الصفة|role)\s*[:：]\s*(.+)$/i.exec(l);if(m){c.role=m[1].slice(0,100);continue}c.quote=(c.quote?c.quote+' ':'')+l}return out.filter(x=>x.quote).map(x=>({...x,quote:x.quote.slice(0,600)}))}
+
+// شهادات العملاء من siteSettings/main للرئيسية. أي فشل يعني قسماً فارغاً، لا صفحة فاشلة.
+async function testimonialsHtml() {
+  try {
+    const r = await fetch(`${BASE}/siteSettings/main?key=${KEY}&mask.fieldPaths=testimonials&mask.fieldPaths=testimonialsTitle`, { signal: AbortSignal.timeout(2500) });
+    if (!r.ok) return '';
+    const s = fields((await r.json()).fields);
+    const a = parseTestimonials(s.testimonials);
+    if (!a.length) return '';
+    return `<h2>${esc(s.testimonialsTitle || 'ماذا يقول عملاؤنا')}</h2><div class="grid">${a.map((x) => `<figure class="card"><blockquote>${esc(x.quote)}</blockquote><figcaption><b>${esc(x.name)}</b>${x.role ? ` — ${esc(x.role)}` : ''}</figcaption></figure>`).join('')}</div>`;
+  } catch {
+    return '';
+  }
+}
+
 const linkList = (items) => `<ul>${items.map(([href, t]) => `<li><a href="${esc(href)}">${esc(t)}</a></li>`).join('')}</ul>`;
 
 async function listPage(name, origin, original, html) {
   const L = LISTS[name];
   let groups;
+  const tmnP = L.home ? testimonialsHtml() : Promise.resolve('');
   try {
     groups = await Promise.all(L.sections.map(([coll, , , n]) => listDocs(coll, n)));
   } catch {
@@ -137,6 +155,7 @@ async function listPage(name, origin, original, html) {
       (heading ? `<h2><a href="${base}">${esc(heading)}</a></h2>` : '') +
       `<div class="grid">${docs.map((d) => `<article class="card"><h3><a href="${base}/${encodeURIComponent(d.slug || d.id)}">${esc(d.title)}</a></h3>${d.description || d.excerpt ? `<p>${esc(String(d.description || d.excerpt).slice(0, 300))}</p>` : ''}</article>`).join('')}</div>`;
   });
+  body += await tmnP;
   const prerender = `<main id="app"><section class="detail"><div class="wrap">${body}</div></section></main>`;
   const cache = 'public, max-age=0, s-maxage=600, stale-while-revalidate=86400';
   if (L.home) return html(original.replace(/<main id="app">[\s\S]*?<\/main>/, () => prerender), cache);
