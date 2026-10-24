@@ -148,3 +148,55 @@ test('middleware: rewrites bots on / to the home list, lets visitors through', a
   const v = JSON.parse(readFileSync(R + 'vercel.json', 'utf8'));
   assert.ok(v.rewrites[0].has[0].value.includes(String(/facebookexternalhit.*Embedly/.exec(readFileSync(R + 'middleware.js', 'utf8'))[0])), 'bot list matches vercel.json');
 });
+
+const learnReq = (track) => new Request(`https://kianalathad.com/api/og?list=learn${track ? `&track=${track}` : ''}`);
+const LESSONS = { articles: [
+  { title: 'درس ٢', slug: 'l2', track: 'websites', description: 'ثاني', createdAt: '2026-09-02T00:00:00Z' },
+  { title: 'درس ١', slug: 'l1', track: 'websites', description: 'أول', createdAt: '2026-09-01T00:00:00Z' },
+  { title: 'درس متجر', slug: 's1', track: 'stores', createdAt: '2026-09-03T00:00:00Z' },
+  { title: 'مقال عادي', slug: 'plain' },
+] };
+
+test('learn: tracks with lessons, in date order, linking to /articles', async () => {
+  stubList(LESSONS);
+  const r = await GET(learnReq()); const h = await r.text();
+  assert.equal(r.status, 200);
+  const main = h.match(/<main id="app">([\s\S]*?)<\/main>/)[1];
+  assert.match(main, /<h1>الأكاديمية<\/h1>/);
+  assert.match(main, /<a href="\/learn\/websites">إنشاء المواقع<\/a>/);
+  assert.match(main, /<a href="\/learn\/stores">المتاجر الإلكترونية<\/a>/);
+  assert.ok(!main.includes('/learn/apps'), 'empty tracks hidden');
+  assert.ok(main.indexOf('/articles/l1') < main.indexOf('/articles/l2'), 'oldest lesson first');
+  assert.ok(!main.includes('مقال عادي'), 'non-lesson articles excluded');
+  assert.match(h, /<link rel="canonical" href="https:\/\/kianalathad\.com\/learn">/);
+  assert.match(h, /<title>الأكاديمية \| كيان للبرمجيات<\/title>/);
+});
+
+test('learn track: its lessons, other tracks, own canonical', async () => {
+  stubList(LESSONS);
+  const h = await (await GET(learnReq('websites'))).text();
+  const main = h.match(/<main id="app">([\s\S]*?)<\/main>/)[1];
+  assert.match(main, /<h1>إنشاء المواقع<\/h1>/);
+  assert.match(main, /<a href="\/articles\/l1">درس ١<\/a>/);
+  assert.ok(!main.includes('/articles/s1'));
+  assert.match(main, /<a href="\/learn\/stores">المتاجر الإلكترونية<\/a>/);
+  assert.match(h, /<link rel="canonical" href="https:\/\/kianalathad\.com\/learn\/websites">/);
+});
+
+test('learn: unknown or empty track is a real 404, no lessons keeps the page', async () => {
+  stubList(LESSONS);
+  assert.equal((await GET(learnReq('nope'))).status, 404);
+  assert.equal((await GET(learnReq('apps'))).status, 404);
+  stubList({});
+  const r = await GET(learnReq());
+  assert.equal(r.status, 200);
+  assert.equal(await r.text(), index);
+});
+
+test('learn tracks and intro match index.html', async () => {
+  const src = readFileSync(R + 'api/og.js', 'utf8');
+  const tracks = (code, re) => JSON.parse(code.match(re)[1].replace(/'/g, '"'));
+  assert.deepEqual(tracks(src, /const LEARN_TRACKS = (\[\[.*?\]\]);/), tracks(index, /const LEARN_TRACKS=(\[\[.*?\]\]);/));
+  const intro = src.match(/const LEARN_INTRO = '([^']+)'/)[1];
+  assert.ok(index.includes(`intro=tr?tr[2]:'${intro}'`));
+});

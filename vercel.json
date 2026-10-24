@@ -13,6 +13,28 @@
       "destination": "/api/og?list=:list"
     },
     {
+      "source": "/learn",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(facebookexternalhit|Facebot|WhatsApp|Twitterbot|TelegramBot|LinkedInBot|Slackbot|Discordbot|Pinterest|Googlebot|bingbot|Applebot|redditbot|Viber|SkypeUriPreview|Embedly).*"
+        }
+      ],
+      "destination": "/api/og?list=learn"
+    },
+    {
+      "source": "/learn/:track",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(facebookexternalhit|Facebot|WhatsApp|Twitterbot|TelegramBot|LinkedInBot|Slackbot|Discordbot|Pinterest|Googlebot|bingbot|Applebot|redditbot|Viber|SkypeUriPreview|Embedly).*"
+        }
+      ],
+      "destination": "/api/og?list=learn&track=:track"
+    },
+    {
       "source": "/:c(articles|services|portfolio|media|products)/:slug",
       "has": [
         {
