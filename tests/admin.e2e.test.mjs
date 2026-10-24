@@ -46,6 +46,9 @@ const smallPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADU
 { const up = await saveWithImage(smallPng, 'image/png', 'tiny.png'); ok(up && up[2] === 'image/png', 'small image uploaded unchanged: ' + JSON.stringify(up)); }
 { const up = await saveWithImage(Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>'), 'image/svg+xml', 'a.svg'); ok(up && up[2] === 'image/svg+xml', 'SVG uploaded unchanged'); }
 
+console.log('About body field');
+ok((await p.$eval('#texts-aboutBody', e => e.tagName)) === 'TEXTAREA' && (await p.$eval('#texts-aboutBody', e => e.maxLength)) === 20000, 'about body is a 20000-char textarea in site settings');
+
 console.log('Service packages');
 await p.selectOption('#pkg-service', 'design'); await p.fill('#pkg-text', 'بدون عنوان'); await p.click('#pkg-save'); await p.waitForTimeout(150);
 ok((await p.textContent('#pkg-msg')).includes('ابدأ كل باقة') && !JSON.stringify(await p.evaluate(() => __ops)).includes('"pkg"'), 'rejects text without a # package heading');

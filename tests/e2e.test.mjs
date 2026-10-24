@@ -289,6 +289,12 @@ console.log('Service pages content');
   }
   ok(p.__errors.length === 0, 'no errors ' + p.__errors.join('|')); }
 
+console.log('About page');
+{ const p = await newPage(); await p.goto(B + '/about'); await p.waitForSelector('.content-body h2');
+  const w = (await p.textContent('main')).split(/\s+/).length; ok(w >= 200 && (await p.$$('main h1')).length === 1, `/about default content: ${w} words, one h1`);
+  const hrefs = await p.$$eval('.content-body a', e => e.map(x => x.getAttribute('href'))); ok(hrefs.includes('/contact') && hrefs.includes('/services/web-development') && hrefs.includes('/tools/qr-code'), 'about links to services, tools and contact');
+  ok(p.__errors.length === 0, 'no errors ' + p.__errors.join('|')); }
+
 console.log('Legal pages');
 for (const [u, h] of [['/privacy', 'سياسة الخصوصية'], ['/terms', 'الشروط والأحكام'], ['/refund', 'سياسة الاسترجاع']]) {
   const p = await newPage(); await p.goto(B + u); await p.waitForSelector('#legal-body.content-body h2', { timeout: 8000 });
