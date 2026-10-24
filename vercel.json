@@ -46,6 +46,10 @@
       "destination": "/api/og?c=:c&slug=:slug"
     },
     {
+      "source": "/en",
+      "destination": "/en.html"
+    },
+    {
       "source": "/sitemap.xml",
       "destination": "/api/sitemap"
     },
