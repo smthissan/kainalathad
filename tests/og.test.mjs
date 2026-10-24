@@ -55,10 +55,19 @@ test('title/description injection is escaped', async () => {
   assert.ok(!/<script>alert|<img src=x/.test(main));
 });
 
-test('missing doc returns the original page untouched', async () => {
+test('missing doc: real 404 with the original page, short cache', async () => {
   stub(null);
-  const h = await (await GET(req('articles', 'nope'))).text();
-  assert.equal(h, index);
+  const r = await GET(req('articles', 'nope'));
+  assert.equal(r.status, 404);
+  assert.equal(await r.text(), index);
+  assert.match(r.headers.get('cache-control'), /s-maxage=60$/);
+});
+
+test('crawler pages carry og:locale ar_AR exactly once', async () => {
+  stub({ title: 'درس', slug: 's3', published: true, description: 'وصف', content: 'نص' });
+  const h = await (await GET(req('articles', 's3'))).text();
+  assert.equal((h.match(/property="og:locale"/g) || []).length, 1);
+  assert.match(h, /<meta property="og:locale" content="ar_AR">/);
 });
 
 test('unreachable template gives 503', async () => {

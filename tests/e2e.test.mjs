@@ -260,6 +260,35 @@ for (const [w, h] of [[1350, 63], [1200, 63], [1024, 124], [412, 63]]) {
   await p.close();
 }
 
+console.log('Analytics');
+{ const p = await newPage(); await p.route('**/_vercel/insights/script.js', r => r.fulfill({ contentType: 'text/javascript', body: '' }));
+  await p.goto(B + '/about'); await p.waitForSelector('main#app h1');
+  ok(!(await p.$('script[src*="_vercel/insights"]')) && !(await p.evaluate(() => !!window.va)), 'not loaded on localhost');
+  await p.evaluate(() => { __kian.initAnalytics('kianalathad.com'); __kian.trackView(); });
+  const sc = await p.$eval('script[src="/_vercel/insights/script.js"]', e => ({ defer: e.defer, auto: e.dataset.disableAutoTrack }));
+  ok(sc.defer && sc.auto === '1', 'script injected deferred with auto-tracking disabled');
+  await p.evaluate(() => { globalThis.vaq.length = 0 }); await p.click('a[href="/contact"]'); await p.waitForSelector('#contact-form');
+  const q = await p.evaluate(() => [...(globalThis.vaq || [])].map(a => [...a])); ok(q.some(a => a[0] === 'pageview' && a[1].path === '/contact' && a[1].route === null), 'pageview sent on SPA navigation: ' + JSON.stringify(q));
+  ok(p.__errors.length === 0, 'no errors ' + p.__errors.join('|')); }
+
+console.log('SEO basics');
+{ const p = await newPage(); await p.goto(B + '/services'); await p.waitForSelector('.learn-more a');
+  ok((await p.$$eval('.learn-more a', e => e.map(x => x.getAttribute('href')))).join() === '/services/web-development,/services/app-development,/services/software-development,/services/design', '/services links the four static service pages (no orphan)');
+  for (const u of ['/services', '/products', '/articles', '/media', '/portfolio', '/about', '/contact', '/terms', '/refund', '/services/design', '/products/ebooks']) {
+    await p.goto(B + u); await p.waitForTimeout(250); const d = await p.$eval('meta[name=description]', e => e.content);
+    ok(d.length >= 70 && d.length <= 170, `${u}: meta description ${d.length} chars`); } }
+
+console.log('Service pages content');
+{ const p = await newPage();
+  for (const u of ['web-development', 'app-development', 'software-development', 'design']) {
+    await p.goto(B + '/services/' + u); await p.waitForSelector('.content-body h2');
+    const w = (await p.textContent('main')).split(/\s+/).length, h1 = (await p.$$('main h1')).length, h2 = (await p.$$('.content-body h2')).length, faq = (await p.$$('.content-body h3')).length;
+    ok(w >= 250 && h1 === 1 && h2 >= 4 && faq >= 4, `/services/${u}: ${w} words, h1=${h1}, sections=${h2}, faq=${faq}`);
+    const hrefs = await p.$$eval('.content-body a', e => e.map(x => x.getAttribute('href')));
+    ok(hrefs.every(h => /^\/(articles|services|portfolio|contact)/.test(h)) && hrefs.includes('/contact'), `/services/${u}: internal links ok (${hrefs.length})`);
+  }
+  ok(p.__errors.length === 0, 'no errors ' + p.__errors.join('|')); }
+
 console.log('Legal pages');
 for (const [u, h] of [['/privacy', 'سياسة الخصوصية'], ['/terms', 'الشروط والأحكام'], ['/refund', 'سياسة الاسترجاع']]) {
   const p = await newPage(); await p.goto(B + u); await p.waitForSelector('#legal-body.content-body h2', { timeout: 8000 });
