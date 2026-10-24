@@ -125,3 +125,26 @@ test('route titles in api/og.js match routeSeo in index.html', async () => {
     assert.ok(h.includes(`<meta name="description" content="${d}">`), p);
   }
 });
+
+test('home: crawler content keeps the original <head>', async () => {
+  stubList({ services: [{ title: 'خدمة', slug: 'svc' }], articles: [{ title: 'مقال', slug: 'a' }] });
+  const h = await (await GET(listReq('home'))).text();
+  const main = h.match(/<main id="app">([\s\S]*?)<\/main>/)[1];
+  assert.match(main, /<h1>نبني حلولًا رقمية تصنع الفرق<\/h1>/);
+  assert.match(main, /<a href="\/services\/svc">خدمة<\/a>/);
+  assert.match(main, /<a href="\/articles\/a">مقال<\/a>/);
+  assert.equal(h.replace(/<main id="app">[\s\S]*?<\/main>/, ''), index.replace(/<main id="app">[\s\S]*?<\/main>/, ''));
+  assert.ok(index.includes(`<meta name="description" content="كيان للبرمجيات يقدم تطوير المواقع والتطبيقات والحلول البرمجية والتصميم.">`));
+});
+
+test('middleware: rewrites bots on / to the home list, lets visitors through', async () => {
+  const { default: mw, config } = await import('../middleware.js');
+  assert.equal(config.matcher, '/');
+  const bot = mw(new Request('https://kianalathad.com/', { headers: { 'user-agent': 'Mozilla/5.0 (compatible; Googlebot/2.1)' } }));
+  assert.equal(bot.headers.get('x-middleware-rewrite'), 'https://kianalathad.com/api/og?list=home');
+  const human = mw(new Request('https://kianalathad.com/', { headers: { 'user-agent': 'Mozilla/5.0 Chrome/130' } }));
+  assert.equal(human.headers.get('x-middleware-next'), '1');
+  assert.equal(human.headers.get('x-middleware-rewrite'), null);
+  const v = JSON.parse(readFileSync(R + 'vercel.json', 'utf8'));
+  assert.ok(v.rewrites[0].has[0].value.includes(String(/facebookexternalhit.*Embedly/.exec(readFileSync(R + 'middleware.js', 'utf8'))[0])), 'bot list matches vercel.json');
+});
