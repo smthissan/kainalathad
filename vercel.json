@@ -2,6 +2,17 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "rewrites": [
     {
+      "source": "/:list(articles|services|portfolio|media|products)",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(facebookexternalhit|Facebot|WhatsApp|Twitterbot|TelegramBot|LinkedInBot|Slackbot|Discordbot|Pinterest|Googlebot|bingbot|Applebot|redditbot|Viber|SkypeUriPreview|Embedly).*"
+        }
+      ],
+      "destination": "/api/og?list=:list"
+    },
+    {
       "source": "/:c(articles|services|portfolio|media|products)/:slug",
       "has": [
         {
